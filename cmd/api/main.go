@@ -20,7 +20,7 @@ func main() {
 	}
 
 	if err := db.AutoMigrate(&models.Conversation{}, &models.Appointment{}); err != nil {
-		log.Fatal("Error migrando base de datos:", err)
+		log.Fatal("Error migrando base de datos: ", err)
 	}
 
 	r := gin.Default()
