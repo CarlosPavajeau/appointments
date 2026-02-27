@@ -55,6 +55,7 @@ func ProcessConversation(db *gorm.DB, msg models.WhatsAppMessage) {
 		isFree, err := CheckAvailability(db, bookedTime)
 		if err != nil {
 			SendWhatsAppMessage(msg.From, "Error interno verificando agenda. Intenta más tarde.")
+			log.Printf("Error DB: %v", err)
 			return
 		}
 		if !isFree {
