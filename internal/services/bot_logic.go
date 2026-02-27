@@ -14,12 +14,7 @@ type TempDataStruct struct {
 	DraftName string `json:"draft_name"`
 }
 
-func ProcessConversation(db *gorm.DB, msg struct {
-	From string `json:"from"`
-	Text struct {
-		Body string `json:"body"`
-	} `json:"text"`
-}) {
+func ProcessConversation(db *gorm.DB, msg models.WhatsAppMessage) {
 	var conv models.Conversation
 
 	if err := db.FirstOrCreate(&conv, models.Conversation{Phone: msg.From}).Error; err != nil {
