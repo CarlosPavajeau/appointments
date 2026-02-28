@@ -3,9 +3,11 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"appointments/internal/models"
+
 	"gorm.io/gorm"
 )
 
@@ -14,23 +16,42 @@ const (
 	TimeZone            = "America/Bogota"
 )
 
+// AppointmentStatus represents the lifecycle state of an appointment.
+type AppointmentStatus string
+
+const StatusConfirmed AppointmentStatus = "CONFIRMED"
+
+// Sentinel errors allow callers to distinguish failure modes with errors.Is.
+var (
+	ErrInvalidFormat = errors.New("formato inválido")
+	ErrDateInThePast = errors.New("la fecha ya pasó")
+)
+
+// bogotaLoc is loaded once at startup; panics if the timezone is unavailable
+// (which would indicate a broken Go installation).
+var bogotaLoc = mustLoadLocation(TimeZone)
+
+func mustLoadLocation(name string) *time.Location {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		panic(fmt.Sprintf("failed to load timezone %q: %v", name, err))
+	}
+	return loc
+}
+
 func ParseAppointmentTime(input string) (time.Time, error) {
-	loc, err := time.LoadLocation(TimeZone)
+	const layout = "02/01 15:04"
+
+	parsed, err := time.ParseInLocation(layout, strings.TrimSpace(input), bogotaLoc)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("error cargando zona horaria: %v", err)
+		return time.Time{}, ErrInvalidFormat
 	}
 
-	layout := "02/01 15:04"
-	parsed, err := time.ParseInLocation(layout, input, loc)
-	if err != nil {
-		return time.Time{}, errors.New("formato inválido")
-	}
-
-	now := time.Now().In(loc)
-	finalTime := time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc)
+	now := time.Now().In(bogotaLoc)
+	finalTime := time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), 0, 0, bogotaLoc)
 
 	if finalTime.Before(now) {
-		return time.Time{}, errors.New("la fecha ya pasó")
+		return time.Time{}, ErrDateInThePast
 	}
 
 	return finalTime, nil
@@ -41,12 +62,10 @@ func CheckAvailability(db *gorm.DB, startTime time.Time) (bool, error) {
 	var count int64
 
 	err := db.Model(&models.Appointment{}).
-		Where("status = ?", "CONFIRMED").
-		Where("start_time < ? AND end_time > ?", endTime, startTime).
+		Where("status = ? AND start_time < ? AND end_time > ?", StatusConfirmed, endTime, startTime).
 		Count(&count).Error
-
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("check availability: %w", err)
 	}
 
 	return count == 0, nil
@@ -58,7 +77,10 @@ func CreateAppointment(db *gorm.DB, phone, name string, startTime time.Time) err
 		ClientName:  name,
 		StartTime:   startTime,
 		EndTime:     startTime.Add(AppointmentDuration),
-		Status:      "CONFIRMED",
+		Status:      string(StatusConfirmed),
 	}
-	return db.Create(&appointment).Error
+	if err := db.Create(&appointment).Error; err != nil {
+		return fmt.Errorf("create appointment: %w", err)
+	}
+	return nil
 }
