@@ -20,10 +20,16 @@ type ReplyButton struct {
 // ---- Outgoing message payload types ----
 
 type textMessageReq struct {
-	MessagingProduct string      `json:"messaging_product"`
-	To               string      `json:"to"`
-	Type             string      `json:"type"`
-	Text             *textBody   `json:"text,omitempty"`
+	MessagingProduct string       `json:"messaging_product"`
+	To               string       `json:"to"`
+	Type             string       `json:"type"`
+	Text             *messageText `json:"text,omitempty"`
+}
+
+// messageText is the "text" object in a plain text message.
+// WhatsApp schema: {"text": {"body": "..."}}
+type messageText struct {
+	Body string `json:"body"`
 }
 
 type interactiveMessageReq struct {
@@ -34,12 +40,14 @@ type interactiveMessageReq struct {
 }
 
 type interactive struct {
-	Type   string       `json:"type"`
-	Body   textBody     `json:"body"`
-	Action buttonAction `json:"action"`
+	Type   string          `json:"type"`
+	Body   interactiveBody `json:"body"`
+	Action buttonAction    `json:"action"`
 }
 
-type textBody struct {
+// interactiveBody is the "body" object inside an interactive message.
+// WhatsApp schema: {"interactive": {"body": {"text": "..."}, ...}}
+type interactiveBody struct {
 	Text string `json:"text"`
 }
 
@@ -85,7 +93,7 @@ func SendWhatsAppMessage(to, body string) error {
 		MessagingProduct: "whatsapp",
 		To:               to,
 		Type:             "text",
-		Text:             &textBody{Text: body},
+		Text:             &messageText{Body: body},
 	})
 }
 
@@ -104,7 +112,7 @@ func SendWhatsAppButtons(to, bodyText string, buttons []ReplyButton) error {
 		Type:             "interactive",
 		Interactive: interactive{
 			Type:   "button",
-			Body:   textBody{Text: bodyText},
+			Body:   interactiveBody{Text: bodyText},
 			Action: buttonAction{Buttons: actionButtons},
 		},
 	})
