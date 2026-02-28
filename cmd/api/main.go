@@ -22,9 +22,12 @@ func main() {
 	r := gin.Default()
 
 	webhookHandler := handlers.NewWebhookHandler(db)
+	appointmentHandler := handlers.NewAppointmentHandler(db)
 
 	r.GET("/webhook", webhookHandler.VerifyToken)
 	r.POST("/webhook", webhookHandler.ReceiveMessage)
+
+	r.GET("/appointments", appointmentHandler.GetAppointments)
 
 	r.Run(":8080")
 }
