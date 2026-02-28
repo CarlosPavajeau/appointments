@@ -74,7 +74,7 @@ func CheckAvailability(db *gorm.DB, startTime time.Time) (bool, error) {
 func GetLatestAppointment(db *gorm.DB, phone string) (*models.Appointment, error) {
 	var appt models.Appointment
 	err := db.Where("client_phone = ?", phone).
-		Order("start_time DESC").
+		Order("created_at DESC").
 		First(&appt).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
