@@ -474,7 +474,6 @@ func (sm *StateMachine) handleCancelConfirm(ctx context.Context, msg IncomingMes
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
-	// Verificar que la cita pertenece al customer — evitar cancelaciones cruzadas
 	if appointment.CustomerID != customer.ID {
 		log.Printf("[scheduling] appointment does not belong to customer | appointmentID=%s customerID=%s",
 			appointmentID, customer.ID)
@@ -482,8 +481,21 @@ func (sm *StateMachine) handleCancelConfirm(ctx context.Context, msg IncomingMes
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
-	svc, _ := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
-	res, _ := sm.useCases.customers.FindByID(ctx, appointment.ResourceID)
+	svc, err := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding service | serviceID=%s err=%v",
+			appointment.ServiceID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"Ocurrió un error. Por favor intenta de nuevo.")
+	}
+
+	res, err := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding resource | resourceID=%s err=%v",
+			appointment.ResourceID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"Ocurrió un error. Por favor intenta de nuevo.")
+	}
 
 	body := fmt.Sprintf(
 		"¿Confirmas la cancelación de esta cita? 🗓️\n\n"+
@@ -515,7 +527,6 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 			"Ocurrió un error. Por favor intenta de nuevo.")
 	}
 
-	// Verificar que la cita pertenece al customer antes de cancelar
 	appointment, err := sm.useCases.appointments.FindByID(ctx, appointmentID, msg.TenantID)
 	if err != nil {
 		log.Printf("[scheduling] ERROR finding appointment to cancel | id=%s err=%v", appointmentID, err)
@@ -540,8 +551,23 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 
 	log.Printf("[scheduling] appointment cancelled | id=%s", appointmentID)
 
-	svc, _ := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
-	res, _ := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
+	svc, err := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding service after cancel | serviceID=%s err=%v",
+			appointment.ServiceID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"✅ Tu cita ha sido cancelada.\n\n"+
+				"Escríbenos cuando quieras agendar una nueva cita 👋")
+	}
+
+	res, err := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding resource after cancel | resourceID=%s err=%v",
+			appointment.ResourceID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"✅ Tu cita ha sido cancelada.\n\n"+
+				"Escríbenos cuando quieras agendar una nueva cita 👋")
+	}
 
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 		fmt.Sprintf(
