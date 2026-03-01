@@ -60,6 +60,8 @@ func (j *ReminderJob) Run(ctx context.Context) {
 }
 
 func (j *ReminderJob) process(ctx context.Context) error {
+	log.Printf("checking for upcoming appointments at %s", time.Now().Format(time.RFC3339))
+
 	upcoming, err := j.appointments.FindUpcomingForReminders(ctx)
 	if err != nil {
 		return err
