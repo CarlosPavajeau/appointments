@@ -75,11 +75,11 @@ func (sm *StateMachine) Process(ctx context.Context, msg IncomingMessage) error 
 
 	case StepSelectDate:
 		log.Printf("[scheduling] dispatching to handleSelectDate | sessionID=%s", session.ID)
-		return sm.handleSelectDate(ctx, msg, session)
+		return sm.handleSelectDate(ctx, msg, session, customer)
 
 	case StepSelectTime:
 		log.Printf("[scheduling] dispatching to handleSelectTime | sessionID=%s", session.ID)
-		return sm.handleSelectTime(ctx, msg, session)
+		return sm.handleSelectTime(ctx, msg, session, customer)
 
 	case StepAwaitingName:
 		log.Printf("[scheduling] dispatching to handleAwaitingName | sessionID=%s", session.ID)
@@ -219,7 +219,12 @@ func (sm *StateMachine) handleSelectResource(ctx context.Context, msg IncomingMe
 	return sm.sendDatePrompt(ctx, msg)
 }
 
-func (sm *StateMachine) handleSelectDate(ctx context.Context, msg IncomingMessage, session *Session) error {
+func (sm *StateMachine) handleSelectDate(
+	ctx context.Context,
+	msg IncomingMessage,
+	session *Session,
+	customer *customers.Customer,
+) error {
 	log.Printf("[scheduling] handleSelectDate | sessionID=%s body=%q attempts=%d",
 		session.ID, msg.Body, session.Data.DateAttempts)
 
@@ -255,9 +260,7 @@ func (sm *StateMachine) handleSelectDate(ctx context.Context, msg IncomingMessag
 			session.ID, result.StartsAt.Format(time.RFC3339))
 		session.Data.StartsAt = &result.StartsAt
 		session.Data.DateAttempts = 0
-		session.Step = StepConfirm
-		sm.useCases.AdvanceSession(ctx, session)
-		return sm.sendConfirmation(ctx, msg, session)
+		return sm.advanceToConfirmOrName(ctx, msg, session, customer)
 	}
 
 	log.Printf("[scheduling] slot taken | sessionID=%s suggestions=%d",
@@ -276,7 +279,12 @@ func (sm *StateMachine) handleSelectDate(ctx context.Context, msg IncomingMessag
 	return sm.sendSlotList(ctx, msg, result.Slots)
 }
 
-func (sm *StateMachine) handleSelectTime(ctx context.Context, msg IncomingMessage, session *Session) error {
+func (sm *StateMachine) handleSelectTime(
+	ctx context.Context,
+	msg IncomingMessage,
+	session *Session,
+	customer *customers.Customer,
+) error {
 	log.Printf("[scheduling] handleSelectTime | sessionID=%s interactiveID=%v",
 		session.ID, msg.InteractiveID)
 
@@ -299,9 +307,7 @@ func (sm *StateMachine) handleSelectTime(ctx context.Context, msg IncomingMessag
 
 	session.Data.StartsAt = &startsAt
 	session.Data.ResourceID = &resourceID
-	session.Step = StepConfirm
-	sm.useCases.AdvanceSession(ctx, session)
-	return sm.sendConfirmation(ctx, msg, session)
+	return sm.advanceToConfirmOrName(ctx, msg, session, customer)
 }
 
 func (sm *StateMachine) handleAwaitingName(ctx context.Context, msg IncomingMessage, session *Session, customer *customers.Customer) error {
@@ -554,6 +560,28 @@ func (sm *StateMachine) sendAppointmentConfirmed(ctx context.Context, msg Incomi
 		tenant.Name,
 	)
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body)
+}
+
+func (sm *StateMachine) advanceToConfirmOrName(
+	ctx context.Context,
+	msg IncomingMessage,
+	session *Session,
+	customer *customers.Customer,
+) error {
+	if customer.HasName() {
+		log.Printf("[scheduling] customer already has name, going to CONFIRM | customerID=%s", customer.ID)
+		name := *customer.Name
+		session.Data.ConfirmedName = &name
+		session.Step = StepConfirm
+		sm.useCases.AdvanceSession(ctx, session)
+		return sm.sendConfirmation(ctx, msg, session)
+	}
+
+	log.Printf("[scheduling] customer has no name, going to AWAITING_NAME | customerID=%s", customer.ID)
+	session.Step = StepAwaitingName
+	sm.useCases.AdvanceSession(ctx, session)
+	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+		"Antes de confirmar, ¿cuál es tu nombre? 😊")
 }
 
 func buildSlotID(slot TimeSlot) string {
