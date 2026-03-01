@@ -102,8 +102,8 @@ func (sm *StateMachine) handleEntry(ctx context.Context, msg IncomingMessage, cu
 	if msg.InteractiveID != nil {
 		log.Printf("[scheduling] entry action received | interactiveID=%s", *msg.InteractiveID)
 
-		switch *msg.InteractiveID {
-		case "action_schedule":
+		switch {
+		case *msg.InteractiveID == "action_schedule":
 			log.Printf("[scheduling] creating new session | customerID=%s", customer.ID)
 			session, err := sm.useCases.CreateSession(ctx, msg.TenantID, msg.WhatsappConfigID, customer.ID)
 			if err != nil {
@@ -113,12 +113,22 @@ func (sm *StateMachine) handleEntry(ctx context.Context, msg IncomingMessage, cu
 			log.Printf("[scheduling] session created | sessionID=%s step=%s", session.ID, session.Step)
 			return sm.sendServiceList(ctx, msg, session)
 
-		case "action_my_appointments":
+		case *msg.InteractiveID == "action_my_appointments":
 			return sm.handleMyAppointments(ctx, msg, customer)
 
-		case "action_cancel":
+		case *msg.InteractiveID == "action_cancel":
 			return sm.handleCancelFlow(ctx, msg, customer)
 
+		case strings.HasPrefix(*msg.InteractiveID, "cancel_"):
+			return sm.handleCancelConfirm(ctx, msg, customer)
+
+		case strings.HasPrefix(*msg.InteractiveID, "confirm_cancel_"):
+			return sm.handleCancelExecute(ctx, msg, customer)
+
+		case *msg.InteractiveID == "action_keep":
+			log.Printf("[scheduling] customer chose to keep appointment | customerID=%s", customer.ID)
+			return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+				"Tu cita sigue activa 👍\nEscríbenos si necesitas algo más.")
 		default:
 			log.Printf("[scheduling] unknown entry action %q, sending welcome | customerID=%s",
 				*msg.InteractiveID, customer.ID)
@@ -441,6 +451,108 @@ func (sm *StateMachine) handleCancelFlow(ctx context.Context, msg IncomingMessag
 	}
 	return sm.wa.SendList(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 		"¿Cuál cita deseas cancelar? 🗓️", sections)
+}
+
+func (sm *StateMachine) handleCancelConfirm(ctx context.Context, msg IncomingMessage, customer *customers.Customer) error {
+	log.Printf("[scheduling] handleCancelConfirm | customerID=%s interactiveID=%s",
+		customer.ID, *msg.InteractiveID)
+
+	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "cancel_"))
+	if err != nil {
+		log.Printf("[scheduling] ERROR parsing appointmentID from %q | err=%v",
+			*msg.InteractiveID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"Ocurrió un error. Por favor intenta de nuevo.")
+	}
+
+	log.Printf("[scheduling] parsed appointmentID | id=%s", appointmentID)
+
+	appointment, err := sm.useCases.appointments.FindByID(ctx, appointmentID, msg.TenantID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding appointment | id=%s err=%v", appointmentID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"No encontramos esa cita. Por favor intenta de nuevo.")
+	}
+
+	// Verificar que la cita pertenece al customer — evitar cancelaciones cruzadas
+	if appointment.CustomerID != customer.ID {
+		log.Printf("[scheduling] appointment does not belong to customer | appointmentID=%s customerID=%s",
+			appointmentID, customer.ID)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"No encontramos esa cita. Por favor intenta de nuevo.")
+	}
+
+	svc, _ := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
+	res, _ := sm.useCases.customers.FindByID(ctx, appointment.ResourceID)
+
+	body := fmt.Sprintf(
+		"¿Confirmas la cancelación de esta cita? 🗓️\n\n"+
+			"✂️ %s con %s\n"+
+			"📅 %s\n\n"+
+			"Esta acción no se puede deshacer.",
+		svc.Name, res.Name,
+		appointment.StartsAt.Format("02/01/2006 03:04 PM"),
+	)
+
+	buttons := []whatsapp.Button{
+		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "confirm_cancel_" + appointmentID.String(), Title: "✅ Sí, cancelar"}},
+		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_keep", Title: "🔙 No, mantener"}},
+	}
+
+	log.Printf("[scheduling] sending cancel confirmation | appointmentID=%s", appointmentID)
+	return sm.wa.SendButtons(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body, buttons)
+}
+
+func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMessage, customer *customers.Customer) error {
+	log.Printf("[scheduling] handleCancelExecute | customerID=%s interactiveID=%s",
+		customer.ID, *msg.InteractiveID)
+
+	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "confirm_cancel_"))
+	if err != nil {
+		log.Printf("[scheduling] ERROR parsing appointmentID | interactiveID=%s err=%v",
+			*msg.InteractiveID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"Ocurrió un error. Por favor intenta de nuevo.")
+	}
+
+	// Verificar que la cita pertenece al customer antes de cancelar
+	appointment, err := sm.useCases.appointments.FindByID(ctx, appointmentID, msg.TenantID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding appointment to cancel | id=%s err=%v", appointmentID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"No encontramos esa cita. Por favor intenta de nuevo.")
+	}
+
+	if appointment.CustomerID != customer.ID {
+		log.Printf("[scheduling] unauthorized cancel attempt | appointmentID=%s customerID=%s",
+			appointmentID, customer.ID)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"No encontramos esa cita. Por favor intenta de nuevo.")
+	}
+
+	if err := sm.useCases.appointments.UpdateStatus(
+		ctx, appointmentID, "cancelled", "customer", "Cancelado por el cliente",
+	); err != nil {
+		log.Printf("[scheduling] ERROR cancelling appointment | id=%s err=%v", appointmentID, err)
+		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+			"Ocurrió un error al cancelar. Por favor intenta de nuevo.")
+	}
+
+	log.Printf("[scheduling] appointment cancelled | id=%s", appointmentID)
+
+	svc, _ := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
+	res, _ := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
+
+	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
+		fmt.Sprintf(
+			"✅ Tu cita ha sido cancelada.\n\n"+
+				"✂️ %s con %s\n"+
+				"📅 %s\n\n"+
+				"Escríbenos cuando quieras agendar una nueva cita 👋",
+			svc.Name, res.Name,
+			appointment.StartsAt.Format("02/01/2006 03:04 PM"),
+		),
+	)
 }
 
 func (sm *StateMachine) sendServiceList(ctx context.Context, msg IncomingMessage, session *Session) error {

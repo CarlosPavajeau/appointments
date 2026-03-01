@@ -22,6 +22,7 @@ type SessionRepository interface {
 
 type AppointmentRepository interface {
 	Create(ctx context.Context, a *Appointment) error
+	FindByID(ctx context.Context, id, tenantID uuid.UUID) (*Appointment, error)
 	FindByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]Appointment, error)
 	FindUpcomingForReminders(ctx context.Context) ([]Appointment, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string) error
@@ -69,6 +70,46 @@ func (r *pgSessionRepository) FindActive(ctx context.Context, tenantID, customer
 	}
 
 	return rowToSession(row)
+}
+
+func (r *pgAppointmentRepository) FindByID(ctx context.Context, id, tenantID uuid.UUID) (*Appointment, error) {
+	var row struct {
+		ID             uuid.UUID `db:"id"`
+		TenantID       uuid.UUID `db:"tenant_id"`
+		ResourceID     uuid.UUID `db:"resource_id"`
+		ServiceID      uuid.UUID `db:"service_id"`
+		CustomerID     uuid.UUID `db:"customer_id"`
+		StartsAt       time.Time `db:"starts_at"`
+		EndsAt         time.Time `db:"ends_at"`
+		Status         string    `db:"status"`
+		PriceAtBooking float64   `db:"price_at_booking"`
+	}
+
+	err := r.db.GetContext(ctx, &row, `
+		SELECT id, tenant_id, resource_id, service_id, customer_id,
+		       starts_at, ends_at, status, price_at_booking
+		FROM appointments
+		WHERE id = $1 AND tenant_id = $2
+	`, id, tenantID)
+
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil, apperrors.ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &Appointment{
+		ID:             row.ID,
+		TenantID:       row.TenantID,
+		ResourceID:     row.ResourceID,
+		ServiceID:      row.ServiceID,
+		CustomerID:     row.CustomerID,
+		StartsAt:       row.StartsAt,
+		EndsAt:         row.EndsAt,
+		Status:         row.Status,
+		PriceAtBooking: row.PriceAtBooking,
+	}, nil
 }
 
 func (r *pgSessionRepository) Create(ctx context.Context, s *Session) error {
