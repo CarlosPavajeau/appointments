@@ -1,7 +1,9 @@
 package tenants
 
 import (
+	"appointments/internal/shared/jwt"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,11 +16,12 @@ import (
 )
 
 type UseCases struct {
-	repo Repository
+	repo             Repository
+	refreshTokenRepo RefreshTokenRepository
 }
 
-func NewUseCases(repo Repository) *UseCases {
-	return &UseCases{repo: repo}
+func NewUseCases(repo Repository, refreshTokenRepo RefreshTokenRepository) *UseCases {
+	return &UseCases{repo: repo, refreshTokenRepo: refreshTokenRepo}
 }
 
 type RegisterTenantInput struct {
@@ -116,7 +119,13 @@ type LoginInput struct {
 	Password   string
 }
 
-func (uc *UseCases) Login(ctx context.Context, input LoginInput) (*TenantUser, *Tenant, error) {
+type TokenPair struct {
+	AccessToken  string
+	RefreshToken string
+	ExpiresIn    int
+}
+
+func (uc *UseCases) Login(ctx context.Context, input LoginInput) (*TokenPair, *Tenant, error) {
 	tenant, err := uc.repo.FindBySlug(ctx, input.TenantSlug)
 	if err != nil {
 		return nil, nil, apperrors.ErrNotFound
@@ -131,8 +140,98 @@ func (uc *UseCases) Login(ctx context.Context, input LoginInput) (*TenantUser, *
 		return nil, nil, apperrors.ErrNotFound
 	}
 
-	return user, tenant, nil
+	pair, err := uc.issueTokenPair(ctx, user, tenant, uuid.New())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pair, tenant, nil
 }
+
+func (uc *UseCases) RefreshTokens(ctx context.Context, plainToken string) (*TokenPair, *Tenant, error) {
+	hash := jwt.HashToken(plainToken)
+
+	rt, err := uc.refreshTokenRepo.FindByHash(ctx, hash)
+	if err != nil {
+		return nil, nil, apperrors.ErrNotFound
+	}
+
+	if rt.IsRevoked() {
+		uc.refreshTokenRepo.RevokeFamily(ctx, rt.FamilyID)
+		return nil, nil, ErrRefreshTokenReuse
+	}
+
+	if rt.IsExpired() {
+		uc.refreshTokenRepo.RevokeByID(ctx, rt.ID)
+		return nil, nil, ErrRefreshTokenExpired
+	}
+
+	if err := uc.refreshTokenRepo.RevokeByID(ctx, rt.ID); err != nil {
+		return nil, nil, err
+	}
+
+	user, err := uc.repo.FindUserByID(ctx, rt.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tenant, err := uc.repo.FindByID(ctx, rt.TenantID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pair, err := uc.issueTokenPair(ctx, user, tenant, rt.FamilyID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return pair, tenant, nil
+}
+
+func (uc *UseCases) Logout(ctx context.Context, plainToken string) error {
+	hash := jwt.HashToken(plainToken)
+	rt, err := uc.refreshTokenRepo.FindByHash(ctx, hash)
+	if err != nil {
+		return nil
+	}
+	return uc.refreshTokenRepo.RevokeByID(ctx, rt.ID)
+}
+
+func (uc *UseCases) issueTokenPair(ctx context.Context, user *TenantUser, tenant *Tenant, familyID uuid.UUID) (*TokenPair, error) {
+	accessToken, err := jwt.GenerateAccessToken(user.ID, tenant.ID, user.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	plain, hash, err := jwt.GenerateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	rt := &RefreshToken{
+		ID:        uuid.New(),
+		TenantID:  tenant.ID,
+		UserID:    user.ID,
+		TokenHash: hash,
+		FamilyID:  familyID,
+		ExpiresAt: time.Now().Add(jwt.RefreshTokenDuration),
+	}
+
+	if err := uc.refreshTokenRepo.Create(ctx, rt); err != nil {
+		return nil, err
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: plain,
+		ExpiresIn:    int(jwt.AccessTokenDuration.Seconds()),
+	}, nil
+}
+
+var (
+	ErrRefreshTokenReuse   = errors.New("refresh token reuse detected")
+	ErrRefreshTokenExpired = errors.New("refresh token expired")
+)
 
 func (uc *UseCases) UpdateSettings(ctx context.Context, tenantID uuid.UUID, settings TenantSettings) error {
 	tenant, err := uc.repo.FindByID(ctx, tenantID)

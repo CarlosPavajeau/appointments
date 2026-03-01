@@ -42,9 +42,10 @@ func main() {
 	sessionRepo := scheduling.NewSessionRepository(db)
 	appointmentRepo := scheduling.NewAppointmentRepository(db)
 	availabilityRepo := scheduling.NewAvailabilityRepository(db)
+	refreshTokenRepo := tenants.NewRefreshTokenRepository(db)
 
 	// ── Use Cases ─────────────────────────────────────────────────
-	tenantUC := tenants.NewUseCases(tenantRepo)
+	tenantUC := tenants.NewUseCases(tenantRepo, refreshTokenRepo)
 	serviceUC := services.NewUseCases(serviceRepo)
 	resourceUC := resources.NewUseCases(resourceRepo)
 	customerUC := customers.NewUseCases(customerRepo)
@@ -110,6 +111,32 @@ func main() {
 					log.Printf("cleanup: error deleting expired sessions: %v", err)
 				} else if n > 0 {
 					log.Printf("cleanup: deleted %d expired sessions", n)
+				}
+			}
+		}
+	}()
+
+	// Cleanup job — clean expired refresh tokens every hour
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				n, err := sessionRepo.DeleteExpired(context.Background())
+				if err != nil {
+					log.Printf("cleanup sessions error: %v", err)
+				} else if n > 0 {
+					log.Printf("cleanup: deleted %d expired sessions", n)
+				}
+
+				n, err = refreshTokenRepo.DeleteExpired(context.Background())
+				if err != nil {
+					log.Printf("cleanup refresh tokens error: %v", err)
+				} else if n > 0 {
+					log.Printf("cleanup: deleted %d expired refresh tokens", n)
 				}
 			}
 		}

@@ -2,9 +2,11 @@ package tenants
 
 import (
 	"appointments/internal/shared/jwt"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -20,6 +22,8 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	{
 		public.POST("/tenants/register", h.Register)
 		public.POST("/tenants/login", h.Login)
+		public.POST("/auth/refresh", h.Refresh)
+		public.POST("/auth/logout", h.Logout)
 	}
 
 	protected := r.Group("/api/v1/tenants")
@@ -57,6 +61,14 @@ type updateSettingsRequest struct {
 	CancellationMsg string `json:"cancellation_message"`
 }
 
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+type logoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 func (h *Handler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -75,7 +87,12 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	token, err := jwt.Generate(output.User.ID, output.Tenant.ID, output.User.Role)
+	pair, err := h.useCases.issueTokenPair(
+		c.Request.Context(),
+		output.User,
+		output.Tenant,
+		uuid.New(),
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token generation failed"})
 		return
@@ -88,7 +105,10 @@ func (h *Handler) Register(c *gin.Context) {
 			"slug": output.Tenant.Slug,
 			"plan": output.Tenant.Plan,
 		},
-		"token": token,
+		"access_token":  pair.AccessToken,
+		"refresh_token": pair.RefreshToken,
+		"expires_in":    pair.ExpiresIn,
+		"token_type":    "Bearer",
 	})
 }
 
@@ -99,19 +119,13 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	user, tenant, err := h.useCases.Login(c.Request.Context(), LoginInput{
+	pair, tenant, err := h.useCases.Login(c.Request.Context(), LoginInput{
 		TenantSlug: req.Slug,
 		Email:      req.Email,
 		Password:   req.Password,
 	})
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-
-	token, err := jwt.Generate(user.ID, tenant.ID, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token generation failed"})
 		return
 	}
 
@@ -122,8 +136,62 @@ func (h *Handler) Login(c *gin.Context) {
 			"slug": tenant.Slug,
 			"plan": tenant.Plan,
 		},
-		"token": token,
+		"access_token":  pair.AccessToken,
+		"refresh_token": pair.RefreshToken,
+		"expires_in":    pair.ExpiresIn,
+		"token_type":    "Bearer",
 	})
+}
+
+func (h *Handler) Refresh(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pair, tenant, err := h.useCases.RefreshTokens(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRefreshTokenReuse):
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "token_reuse_detected",
+				"hint":  "please log in again",
+			})
+		case errors.Is(err, ErrRefreshTokenExpired):
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "refresh_token_expired",
+				"hint":  "please log in again",
+			})
+		default:
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_refresh_token"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"tenant": gin.H{
+			"id":   tenant.ID,
+			"name": tenant.Name,
+			"slug": tenant.Slug,
+			"plan": tenant.Plan,
+		},
+		"access_token":  pair.AccessToken,
+		"refresh_token": pair.RefreshToken,
+		"expires_in":    pair.ExpiresIn,
+		"token_type":    "Bearer",
+	})
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	var req logoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.useCases.Logout(c.Request.Context(), req.RefreshToken)
+	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 
 func (h *Handler) GetMe(c *gin.Context) {

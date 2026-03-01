@@ -1,6 +1,9 @@
 package jwt
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"time"
@@ -10,6 +13,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	AccessTokenDuration  = 15 * time.Minute
+	RefreshTokenDuration = 7 * 24 * time.Hour
+)
+
 type Claims struct {
 	UserID   uuid.UUID `json:"user_id"`
 	TenantID uuid.UUID `json:"tenant_id"`
@@ -17,14 +25,15 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func Generate(userID, tenantID uuid.UUID, role string) (string, error) {
+func GenerateAccessToken(userID, tenantID uuid.UUID, role string) (string, error) {
 	claims := Claims{
 		UserID:   userID,
 		TenantID: tenantID,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(AccessTokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ID:        uuid.New().String(), // jti — Unique per token
 		},
 	}
 
@@ -32,7 +41,7 @@ func Generate(userID, tenantID uuid.UUID, role string) (string, error) {
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
-func Verify(tokenStr string) (*Claims, error) {
+func VerifyAccessToken(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -50,6 +59,22 @@ func Verify(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
+func GenerateRefreshToken() (plain string, hash string, err error) {
+	bytes := make([]byte, 32)
+	if _, err = rand.Read(bytes); err != nil {
+		return "", "", err
+	}
+
+	plain = hex.EncodeToString(bytes)
+	hash = HashToken(plain)
+	return plain, hash, nil
+}
+
+func HashToken(plain string) string {
+	h := sha256.Sum256([]byte(plain))
+	return hex.EncodeToString(h[:])
+}
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -58,9 +83,18 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := Verify(header[7:])
+		claims, err := VerifyAccessToken(header[7:])
 		if err != nil {
-			c.AbortWithStatusJSON(401, gin.H{"error": "invalid token"})
+			// Distinguishing between expired tokens and invalid tokens
+			// The client should only refresh if it has expired
+			if errors.Is(err, jwt.ErrTokenExpired) {
+				c.AbortWithStatusJSON(401, gin.H{
+					"error": "token_expired",
+					"hint":  "use refresh token to get a new access token",
+				})
+				return
+			}
+			c.AbortWithStatusJSON(401, gin.H{"error": "invalid_token"})
 			return
 		}
 
