@@ -9,7 +9,7 @@ import (
 )
 
 func Connect(url string) *sqlx.DB {
-	db, err := sqlx.Connect("pgx", url)
+	db, err := sqlx.Open("pgx", url)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
