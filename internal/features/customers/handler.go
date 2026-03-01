@@ -1,6 +1,7 @@
 package customers
 
 import (
+	"appointments/internal/shared/jwt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,11 +18,13 @@ func NewHandler(uc *UseCases) *Handler {
 
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	g := r.Group("/api/v1/customers")
-
-	g.GET("", h.List)
-	g.GET("/:id", h.GetByID)
-	g.POST("/:id/block", h.Block)
-	g.POST("/:id/unblock", h.Unblock)
+	g.Use(jwt.AuthMiddleware())
+	{
+		g.GET("", h.List)
+		g.GET("/:id", h.GetByID)
+		g.POST("/:id/block", h.Block)
+		g.POST("/:id/unblock", h.Unblock)
+	}
 }
 
 type customerResponse struct {
@@ -43,13 +46,7 @@ func toResponse(c Customer) customerResponse {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	rawTenantID := c.Query("tenant_id")
-	tenantID, err := uuid.Parse(rawTenantID)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
-		return
-	}
+	tenantID := jwt.TenantIDFromContext(c)
 
 	customers, err := h.useCases.GetAll(c.Request.Context(), tenantID)
 	if err != nil {
@@ -71,13 +68,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	rawTenantID := c.Query("tenant_id")
-	tenantID, err := uuid.Parse(rawTenantID)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
-		return
-	}
+	tenantID := jwt.TenantIDFromContext(c)
 
 	customer, err := h.useCases.GetByID(c.Request.Context(), id, tenantID)
 	if err != nil {
@@ -95,13 +86,7 @@ func (h *Handler) Block(c *gin.Context) {
 		return
 	}
 
-	rawTenantID := c.Query("tenant_id")
-	tenantID, err := uuid.Parse(rawTenantID)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
-		return
-	}
+	tenantID := jwt.TenantIDFromContext(c)
 
 	if err := h.useCases.Block(c.Request.Context(), id, tenantID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to block customer"})
@@ -118,13 +103,7 @@ func (h *Handler) Unblock(c *gin.Context) {
 		return
 	}
 
-	rawTenantID := c.Query("tenant_id")
-	tenantID, err := uuid.Parse(rawTenantID)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
-		return
-	}
+	tenantID := jwt.TenantIDFromContext(c)
 
 	if err := h.useCases.Unblock(c.Request.Context(), id, tenantID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unblock customer"})
