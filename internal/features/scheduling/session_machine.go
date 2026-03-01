@@ -97,15 +97,41 @@ func (sm *StateMachine) Process(ctx context.Context, msg IncomingMessage) error 
 }
 
 func (sm *StateMachine) handleEntry(ctx context.Context, msg IncomingMessage, customer *customers.Customer) error {
-	log.Printf("[scheduling] handleEntry | customerID=%s", customer.ID)
+	log.Printf("[scheduling] handleEntry | customerID=%s interactiveID=%v", customer.ID, msg.InteractiveID)
+
+	if msg.InteractiveID != nil {
+		log.Printf("[scheduling] entry action received | interactiveID=%s", *msg.InteractiveID)
+
+		switch *msg.InteractiveID {
+		case "action_schedule":
+			log.Printf("[scheduling] creating new session | customerID=%s", customer.ID)
+			session, err := sm.useCases.CreateSession(ctx, msg.TenantID, msg.WhatsappConfigID, customer.ID)
+			if err != nil {
+				log.Printf("[scheduling] ERROR creating session | customerID=%s err=%v", customer.ID, err)
+				return fmt.Errorf("create session: %w", err)
+			}
+			log.Printf("[scheduling] session created | sessionID=%s step=%s", session.ID, session.Step)
+			return sm.sendServiceList(ctx, msg, session)
+
+		case "action_my_appointments":
+			return sm.handleMyAppointments(ctx, msg, customer)
+
+		case "action_cancel":
+			return sm.handleCancelFlow(ctx, msg, customer)
+
+		default:
+			log.Printf("[scheduling] unknown entry action %q, sending welcome | customerID=%s",
+				*msg.InteractiveID, customer.ID)
+		}
+	}
+
+	log.Printf("[scheduling] sending welcome menu | customerID=%s", customer.ID)
 
 	tenant, err := sm.tenantRepo.FindByID(ctx, msg.TenantID)
 	if err != nil {
-		log.Printf("[scheduling] ERROR finding tenant in handleEntry | tenantID=%s err=%v",
-			msg.TenantID, err)
+		log.Printf("[scheduling] ERROR finding tenant | tenantID=%s err=%v", msg.TenantID, err)
 		return fmt.Errorf("find tenant: %w", err)
 	}
-	log.Printf("[scheduling] tenant found | name=%s plan=%s", tenant.Name, tenant.Plan)
 
 	body := fmt.Sprintf("👋 ¡Hola! Bienvenido a *%s*\n\n¿Qué deseas hacer?", tenant.Name)
 	buttons := []whatsapp.Button{
@@ -114,37 +140,7 @@ func (sm *StateMachine) handleEntry(ctx context.Context, msg IncomingMessage, cu
 		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_cancel", Title: "❌ Cancelar cita"}},
 	}
 
-	if err := sm.wa.SendButtons(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body, buttons); err != nil {
-		log.Printf("[scheduling] ERROR sending entry buttons | to=%s err=%v", msg.From, err)
-		return fmt.Errorf("send entry buttons: %w", err)
-	}
-
-	if msg.InteractiveID == nil {
-		log.Printf("[scheduling] no interactiveID in entry, waiting for user action | from=%s", msg.From)
-		return nil
-	}
-
-	log.Printf("[scheduling] entry action selected | interactiveID=%s", *msg.InteractiveID)
-
-	switch *msg.InteractiveID {
-	case "action_schedule":
-		log.Printf("[scheduling] creating new session for scheduling | customerID=%s", customer.ID)
-		session, err := sm.useCases.CreateSession(ctx, msg.TenantID, msg.WhatsappConfigID, customer.ID)
-		if err != nil {
-			log.Printf("[scheduling] ERROR creating session | customerID=%s err=%v", customer.ID, err)
-			return fmt.Errorf("create session: %w", err)
-		}
-		log.Printf("[scheduling] session created | sessionID=%s step=%s", session.ID, session.Step)
-		return sm.sendServiceList(ctx, msg, session)
-
-	case "action_my_appointments":
-		return sm.handleMyAppointments(ctx, msg, customer)
-
-	case "action_cancel":
-		return sm.handleCancelFlow(ctx, msg, customer)
-	}
-
-	return nil
+	return sm.wa.SendButtons(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body, buttons)
 }
 
 func (sm *StateMachine) handleSelectService(ctx context.Context, msg IncomingMessage, session *Session) error {
