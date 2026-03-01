@@ -243,6 +243,47 @@ func (r *pgRepository) UpdateWhatsappConfig(ctx context.Context, cfg *WhatsappCo
 	return err
 }
 
+func (r *pgRepository) CreateUser(ctx context.Context, u *TenantUser) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO tenant_users (id, tenant_id, email, password_hash, role)
+		VALUES ($1,$2,$3,$4,$5)
+	`, u.ID, u.TenantID, u.Email, u.PasswordHash, u.Role)
+	return err
+}
+
+func (r *pgRepository) FindUserByEmail(ctx context.Context, tenantID uuid.UUID, email string) (*TenantUser, error) {
+	var row struct {
+		ID           uuid.UUID `db:"id"`
+		TenantID     uuid.UUID `db:"tenant_id"`
+		Email        string    `db:"email"`
+		PasswordHash string    `db:"password_hash"`
+		Role         string    `db:"role"`
+		CreatedAt    time.Time `db:"created_at"`
+	}
+
+	err := r.db.GetContext(ctx, &row, `
+		SELECT id, tenant_id, email, password_hash, role, created_at
+		FROM tenant_users
+		WHERE tenant_id = $1 AND email = $2
+	`, tenantID, email)
+
+	if database.IsNotFound(err) {
+		return nil, apperrors.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &TenantUser{
+		ID:           row.ID,
+		TenantID:     row.TenantID,
+		Email:        row.Email,
+		PasswordHash: row.PasswordHash,
+		Role:         row.Role,
+		CreatedAt:    row.CreatedAt,
+	}, nil
+}
+
 func (r *pgRepository) rowToConfig(row whatsappConfigRow) (*WhatsappConfig, error) {
 	decrypted, err := crypto.Decrypt(row.AccessToken, r.encryptionKey)
 	if err != nil {

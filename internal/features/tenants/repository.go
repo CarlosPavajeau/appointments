@@ -19,6 +19,8 @@ type Repository interface {
 	FindWhatsappConfigByPhoneNumberID(ctx context.Context, phoneNumberID string) (*WhatsappConfig, *Tenant, error)
 	CreateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	UpdateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
+	CreateUser(ctx context.Context, u *TenantUser) error
+	FindUserByEmail(ctx context.Context, tenantID uuid.UUID, email string) (*TenantUser, error)
 }
 
 type tenantRow struct {

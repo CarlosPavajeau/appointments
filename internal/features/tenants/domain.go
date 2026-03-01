@@ -49,6 +49,15 @@ type WhatsappConfig struct {
 	UpdatedAt          time.Time
 }
 
+type TenantUser struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	Email        string
+	PasswordHash string
+	Role         string
+	CreatedAt    time.Time
+}
+
 var FreemiumLimits = map[Plan]int{
 	PlanFree: 30,
 	PlanPro:  -1, // -1 = unlimited
