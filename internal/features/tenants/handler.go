@@ -122,7 +122,11 @@ func (h *Handler) Login(c *gin.Context) {
 		Password: req.Password,
 	})
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		if errors.Is(err, ErrInvalidCredentials) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "login failed"})
+		}
 		return
 	}
 

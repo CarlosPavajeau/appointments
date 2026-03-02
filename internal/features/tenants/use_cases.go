@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -127,23 +128,28 @@ type TokenPair struct {
 func (uc *UseCases) Login(ctx context.Context, input LoginInput) (*TokenPair, *Tenant, error) {
 	user, err := uc.repo.FindUserByEmail(ctx, input.Email)
 	if err != nil {
-		return nil, nil, apperrors.ErrNotFound
+		log.Printf("login: user not found email=%s", input.Email)
+		return nil, nil, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		return nil, nil, apperrors.ErrNotFound
+		log.Printf("login: wrong password user_id=%s email=%s", user.ID, input.Email)
+		return nil, nil, ErrInvalidCredentials
 	}
 
 	tenant, err := uc.repo.FindByID(ctx, user.TenantID)
 	if err != nil {
-		return nil, nil, apperrors.ErrNotFound
+		log.Printf("login: tenant not found user_id=%s tenant_id=%s err=%v", user.ID, user.TenantID, err)
+		return nil, nil, ErrInvalidCredentials
 	}
 
 	pair, err := uc.issueTokenPair(ctx, user, tenant, uuid.New())
 	if err != nil {
+		log.Printf("login: failed to issue tokens user_id=%s tenant_id=%s err=%v", user.ID, tenant.ID, err)
 		return nil, nil, err
 	}
 
+	log.Printf("login: success user_id=%s tenant_id=%s", user.ID, tenant.ID)
 	return pair, tenant, nil
 }
 
@@ -228,6 +234,7 @@ func (uc *UseCases) issueTokenPair(ctx context.Context, user *TenantUser, tenant
 }
 
 var (
+	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrRefreshTokenReuse   = errors.New("refresh token reuse detected")
 	ErrRefreshTokenExpired = errors.New("refresh token expired")
 )
