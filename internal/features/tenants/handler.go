@@ -37,7 +37,6 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 
 type registerRequest struct {
 	Name     string `json:"name"     binding:"required,min=2"`
-	Timezone string `json:"timezone" binding:"required"`
 	Email    string `json:"email"    binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 }
@@ -77,7 +76,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	output, err := h.useCases.RegisterTenant(c.Request.Context(), RegisterTenantInput{
 		Name:     req.Name,
-		Timezone: req.Timezone,
+		Timezone: "America/Bogota",
 		Email:    req.Email,
 		Password: req.Password,
 	})
