@@ -24,7 +24,7 @@ type Repository interface {
 	CreateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	UpdateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	CreateUser(ctx context.Context, u *TenantUser) error
-	FindUserByEmail(ctx context.Context, tenantID uuid.UUID, email string) (*TenantUser, error)
+	FindUserByEmail(ctx context.Context, email string) (*TenantUser, error)
 	FindUserByID(ctx context.Context, id uuid.UUID) (*TenantUser, error)
 }
 
@@ -266,7 +266,7 @@ func (r *pgRepository) CreateUser(ctx context.Context, u *TenantUser) error {
 	return err
 }
 
-func (r *pgRepository) FindUserByEmail(ctx context.Context, tenantID uuid.UUID, email string) (*TenantUser, error) {
+func (r *pgRepository) FindUserByEmail(ctx context.Context, email string) (*TenantUser, error) {
 	var row struct {
 		ID           uuid.UUID `db:"id"`
 		TenantID     uuid.UUID `db:"tenant_id"`
@@ -279,8 +279,8 @@ func (r *pgRepository) FindUserByEmail(ctx context.Context, tenantID uuid.UUID, 
 	err := r.db.GetContext(ctx, &row, `
 		SELECT id, tenant_id, email, password_hash, role, created_at
 		FROM tenant_users
-		WHERE tenant_id = $1 AND email = $2
-	`, tenantID, email)
+		WHERE email = $2
+	`, email)
 
 	if database.IsNotFound(err) {
 		return nil, apperrors.ErrNotFound

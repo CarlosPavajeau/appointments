@@ -43,7 +43,6 @@ type registerRequest struct {
 }
 
 type loginRequest struct {
-	Slug     string `json:"slug"     binding:"required"`
 	Email    string `json:"email"    binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
@@ -120,9 +119,8 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	pair, tenant, err := h.useCases.Login(c.Request.Context(), LoginInput{
-		TenantSlug: req.Slug,
-		Email:      req.Email,
-		Password:   req.Password,
+		Email:    req.Email,
+		Password: req.Password,
 	})
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})

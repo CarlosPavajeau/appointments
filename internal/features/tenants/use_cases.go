@@ -114,9 +114,8 @@ func (uc *UseCases) VerifyWebhook(ctx context.Context, phoneNumberID string) err
 }
 
 type LoginInput struct {
-	TenantSlug string
-	Email      string
-	Password   string
+	Email    string
+	Password string
 }
 
 type TokenPair struct {
@@ -126,17 +125,17 @@ type TokenPair struct {
 }
 
 func (uc *UseCases) Login(ctx context.Context, input LoginInput) (*TokenPair, *Tenant, error) {
-	tenant, err := uc.repo.FindBySlug(ctx, input.TenantSlug)
-	if err != nil {
-		return nil, nil, apperrors.ErrNotFound
-	}
-
-	user, err := uc.repo.FindUserByEmail(ctx, tenant.ID, input.Email)
+	user, err := uc.repo.FindUserByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, nil, apperrors.ErrNotFound
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+		return nil, nil, apperrors.ErrNotFound
+	}
+
+	tenant, err := uc.repo.FindByID(ctx, user.TenantID)
+	if err != nil {
 		return nil, nil, apperrors.ErrNotFound
 	}
 
