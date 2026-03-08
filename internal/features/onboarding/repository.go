@@ -69,7 +69,7 @@ func (r *pgRepository) Create(ctx context.Context, tenantID uuid.UUID) (*Progres
 		INSERT INTO onboarding_progress (id, tenant_id, current_step)
 		VALUES ($1, $2, $3)
 		RETURNING id, tenant_id, current_step, completed_at, created_at, updated_at
-	`, uuid.New(), tenantID, StepAccount)
+	`, uuid.New(), tenantID, StepBarber)
 
 	if err != nil {
 		return nil, err
