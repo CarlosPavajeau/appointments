@@ -61,8 +61,7 @@ func (uc *UseCases) VerifyWebhook(ctx context.Context, phoneNumberID string) err
 		return apperrors.ErrNotFound
 	}
 
-	now := time.Now()
-	cfg.VerifiedAt = &now
+	cfg.VerifiedAt = new(time.Now())
 	return uc.repo.UpdateWhatsappConfig(ctx, cfg)
 }
 
