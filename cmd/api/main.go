@@ -54,16 +54,16 @@ func main() {
 
 	// ── Use Cases ────────────────────────────────────────
 	userUseCases := users.NewUseCases(userRepo)
+	tenantUC := tenants.NewUseCases(tenantRepo)
 	onboardingUC := onboarding.NewUseCases(
 		onboardingRepo,
-		tenantRepo,
+		tenantUC,
 		resourceRepo,
 		serviceRepo,
 		resendMailer,
 		cfg.AdminEmail,
 	)
-	tenantUC := tenants.NewUseCases(tenantRepo)
-	authUC := auth.NewUseCases(tenantUC, userUseCases, refreshTokenRepo)
+	authUC := auth.NewUseCases(tenantUC, userUseCases, onboardingUC, refreshTokenRepo)
 	serviceUC := services.NewUseCases(serviceRepo)
 	resourceUC := resources.NewUseCases(resourceRepo)
 	customerUC := customers.NewUseCases(customerRepo)

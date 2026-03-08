@@ -179,7 +179,7 @@ func (h *Handler) CompleteStepWhatsApp(c *gin.Context) {
 // ── Admin handlers ────────────────────────────────────────────────
 
 func (h *Handler) ListActivations(c *gin.Context) {
-	activations, err := h.useCases.tenantRepo.FindPendingActivations(c.Request.Context())
+	activations, err := h.useCases.ListActivations(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch activations"})
 		return

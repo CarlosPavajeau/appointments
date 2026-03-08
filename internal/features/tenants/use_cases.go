@@ -77,3 +77,15 @@ func (uc *UseCases) UpdateSettings(ctx context.Context, tenantID uuid.UUID, sett
 func (uc *UseCases) ResolveWebhook(ctx context.Context, phoneNumberID string) (*WhatsappConfig, *Tenant, error) {
 	return uc.repo.FindWhatsappConfigByPhoneNumberID(ctx, phoneNumberID)
 }
+
+func (uc *UseCases) CreateWhatsappConfigPending(ctx context.Context, input CreateWhatsappConfigPendingInput) error {
+	return uc.repo.CreateWhatsappConfigPending(ctx, input)
+}
+
+func (uc *UseCases) ActivateWhatsappConfig(ctx context.Context, input ActivateWhatsappConfigInput) error {
+	return uc.repo.ActivateWhatsappConfig(ctx, input)
+}
+
+func (uc *UseCases) FindPendingActivations(ctx context.Context) ([]WhatsappConfig, error) {
+	return uc.repo.FindPendingActivations(ctx)
+}

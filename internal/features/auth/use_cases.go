@@ -31,17 +31,29 @@ type UserService interface {
 	FindByEmail(ctx context.Context, email string) (*users.User, error)
 }
 
+// OnboardingService defines the onboarding operations needed by auth.
+type OnboardingService interface {
+	InitProgress(ctx context.Context, tenantID uuid.UUID) error
+}
+
 // UseCases handles all authentication and session lifecycle business logic.
 type UseCases struct {
 	tenantService    TenantService
 	userService      UserService
+	onboarding       OnboardingService
 	refreshTokenRepo RefreshTokenRepository
 }
 
-func NewUseCases(tenantService TenantService, userService UserService, refreshTokenRepo RefreshTokenRepository) *UseCases {
+func NewUseCases(
+	tenantService TenantService,
+	userService UserService,
+	onboarding OnboardingService,
+	refreshTokenRepo RefreshTokenRepository,
+) *UseCases {
 	return &UseCases{
 		tenantService:    tenantService,
 		userService:      userService,
+		onboarding:       onboarding,
 		refreshTokenRepo: refreshTokenRepo,
 	}
 }
@@ -89,6 +101,10 @@ func (uc *UseCases) Register(ctx context.Context, input RegisterInput) (*Registe
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register user: %w", err)
+	}
+
+	if err := uc.onboarding.InitProgress(ctx, tenant.ID); err != nil {
+		return nil, fmt.Errorf("init onboarding: %w", err)
 	}
 
 	pair, err := uc.issueTokenPair(ctx, user, tenant, uuid.New())

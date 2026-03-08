@@ -3,7 +3,6 @@ package onboarding
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"appointments/internal/features/resources"
 	"appointments/internal/features/services"
@@ -13,39 +12,56 @@ import (
 	"github.com/google/uuid"
 )
 
+// TenantService defines the tenant operations needed by onboarding.
+// Using a narrow interface keeps onboarding decoupled from the full tenants.Repository.
+type TenantService interface {
+	FindByID(ctx context.Context, id uuid.UUID) (*tenants.Tenant, error)
+	CreateWhatsappConfigPending(ctx context.Context, input tenants.CreateWhatsappConfigPendingInput) error
+	ActivateWhatsappConfig(ctx context.Context, input tenants.ActivateWhatsappConfigInput) error
+	FindPendingActivations(ctx context.Context) ([]tenants.WhatsappConfig, error)
+}
+
 type UseCases struct {
-	repo         Repository
-	tenantRepo   tenants.Repository
-	resourceRepo resources.Repository
-	serviceRepo  services.Repository
-	mailer       mailer.Mailer
-	adminEmail   string
+	repo          Repository
+	tenantService TenantService
+	resourceRepo  resources.Repository
+	serviceRepo   services.Repository
+	mailer        mailer.Mailer
+	adminEmail    string
 }
 
 func NewUseCases(
 	repo Repository,
-	tenantRepo tenants.Repository,
+	tenantService TenantService,
 	resourceRepo resources.Repository,
 	serviceRepo services.Repository,
 	mailer mailer.Mailer,
 	adminEmail string,
 ) *UseCases {
 	return &UseCases{
-		repo:         repo,
-		tenantRepo:   tenantRepo,
-		resourceRepo: resourceRepo,
-		serviceRepo:  serviceRepo,
-		mailer:       mailer,
-		adminEmail:   adminEmail,
+		repo:          repo,
+		tenantService: tenantService,
+		resourceRepo:  resourceRepo,
+		serviceRepo:   serviceRepo,
+		mailer:        mailer,
+		adminEmail:    adminEmail,
 	}
 }
 
+// GetProgress returns the onboarding progress for a tenant.
 func (uc *UseCases) GetProgress(ctx context.Context, tenantID uuid.UUID) (*Progress, error) {
 	return uc.repo.FindByTenant(ctx, tenantID)
 }
 
-func (uc *UseCases) InitProgress(ctx context.Context, tenantID uuid.UUID) (*Progress, error) {
-	return uc.repo.Create(ctx, tenantID)
+// InitProgress creates the onboarding progress record for a new tenant.
+// It is idempotent: if a record already exists it returns without error.
+func (uc *UseCases) InitProgress(ctx context.Context, tenantID uuid.UUID) error {
+	_, err := uc.repo.FindByTenant(ctx, tenantID)
+	if err == nil {
+		return nil // already initialised
+	}
+	_, err = uc.repo.Create(ctx, tenantID)
+	return err
 }
 
 type StepBarberInput struct {
@@ -56,6 +72,7 @@ type StepBarberInput struct {
 	EndTime     string
 }
 
+// CompleteStepBarber creates the barber resource and advances the onboarding step.
 func (uc *UseCases) CompleteStepBarber(ctx context.Context, input StepBarberInput) error {
 	progress, err := uc.repo.FindByTenant(ctx, input.TenantID)
 	if err != nil {
@@ -108,6 +125,7 @@ type StepServicesInput struct {
 	Services []StepServiceItem
 }
 
+// CompleteStepServices creates the services and assigns them to the first barber resource.
 func (uc *UseCases) CompleteStepServices(ctx context.Context, input StepServicesInput) error {
 	progress, err := uc.repo.FindByTenant(ctx, input.TenantID)
 	if err != nil {
@@ -132,7 +150,7 @@ func (uc *UseCases) CompleteStepServices(ctx context.Context, input StepServices
 	}
 
 	firstResource := existingResources[0]
-	var serviceIDs []uuid.UUID
+	serviceIDs := make([]uuid.UUID, 0, len(input.Services))
 
 	for i, item := range input.Services {
 		svc := &services.Service{
@@ -170,43 +188,33 @@ type StepWhatsAppInput struct {
 	Notes        string
 }
 
+// CompleteStepWhatsApp submits the WhatsApp activation request and completes onboarding.
 func (uc *UseCases) CompleteStepWhatsApp(ctx context.Context, input StepWhatsAppInput) error {
-	log.Printf("onboarding: step4 start tenant_id=%s", input.TenantID)
-
 	progress, err := uc.repo.FindByTenant(ctx, input.TenantID)
 	if err != nil {
-		log.Printf("onboarding: step4 find_progress error tenant_id=%s err=%v", input.TenantID, err)
 		return err
 	}
-	log.Printf("onboarding: step4 progress current_step=%d tenant_id=%s", progress.CurrentStep, input.TenantID)
 
 	if !progress.CanAccessStep(StepWhatsApp) {
-		log.Printf("onboarding: step4 not_available current_step=%d tenant_id=%s", progress.CurrentStep, input.TenantID)
 		return ErrStepNotAvailable
 	}
 
-	tenant, err := uc.tenantRepo.FindByID(ctx, input.TenantID)
+	tenant, err := uc.tenantService.FindByID(ctx, input.TenantID)
 	if err != nil {
-		log.Printf("onboarding: step4 find_tenant error tenant_id=%s err=%v", input.TenantID, err)
 		return fmt.Errorf("find tenant: %w", err)
 	}
-	log.Printf("onboarding: step4 tenant_found name=%q tenant_id=%s", tenant.Name, input.TenantID)
 
-	if err := uc.tenantRepo.CreateWhatsappConfigPending(ctx, tenants.CreateWhatsappConfigPendingInput{
+	if err := uc.tenantService.CreateWhatsappConfigPending(ctx, tenants.CreateWhatsappConfigPendingInput{
 		TenantID:     input.TenantID,
 		ContactEmail: input.ContactEmail,
 		Notes:        input.Notes,
 	}); err != nil {
-		log.Printf("onboarding: step4 create_whatsapp_config_pending error tenant_id=%s err=%v", input.TenantID, err)
 		return fmt.Errorf("create whatsapp config: %w", err)
 	}
-	log.Printf("onboarding: step4 whatsapp_config_pending created tenant_id=%s", input.TenantID)
 
 	if err := uc.repo.Complete(ctx, input.TenantID); err != nil {
-		log.Printf("onboarding: step4 complete_onboarding error tenant_id=%s err=%v", input.TenantID, err)
 		return fmt.Errorf("complete onboarding: %w", err)
 	}
-	log.Printf("onboarding: step4 onboarding completed tenant_id=%s", input.TenantID)
 
 	go uc.mailer.Send(ctx, mailer.Email{
 		To:      input.ContactEmail,
@@ -231,13 +239,14 @@ type ActivateTenantInput struct {
 	AccessToken        string
 }
 
+// ActivateTenant activates the WhatsApp config for a tenant and notifies the owner.
 func (uc *UseCases) ActivateTenant(ctx context.Context, input ActivateTenantInput) error {
-	tenant, err := uc.tenantRepo.FindByID(ctx, input.TenantID)
+	tenant, err := uc.tenantService.FindByID(ctx, input.TenantID)
 	if err != nil {
 		return fmt.Errorf("find tenant: %w", err)
 	}
 
-	if err := uc.tenantRepo.ActivateWhatsappConfig(ctx, tenants.ActivateWhatsappConfigInput{
+	if err := uc.tenantService.ActivateWhatsappConfig(ctx, tenants.ActivateWhatsappConfigInput{
 		TenantID:           input.TenantID,
 		PhoneNumberID:      input.PhoneNumberID,
 		DisplayPhoneNumber: input.DisplayPhoneNumber,
@@ -256,6 +265,26 @@ func (uc *UseCases) ActivateTenant(ctx context.Context, input ActivateTenantInpu
 	return nil
 }
 
+// ListActivations returns all tenants pending WhatsApp activation.
+func (uc *UseCases) ListActivations(ctx context.Context) ([]tenants.WhatsappConfig, error) {
+	return uc.tenantService.FindPendingActivations(ctx)
+}
+
+// GetTemplates returns the available service templates for onboarding.
+func (uc *UseCases) GetTemplates() map[string][]ServiceTemplate {
+	return Templates
+}
+
+var (
+	ErrStepNotAvailable = onboardingError("step not available yet")
+	ErrServicesRequired = onboardingError("at least one service is required")
+	ErrBarberRequired   = onboardingError("complete the barber step first")
+)
+
+type onboardingError string
+
+func (e onboardingError) Error() string { return string(e) }
+
 func buildActivationEmail(tenantName, phoneNumber string) string {
 	waLink := "https://wa.me/" + sanitizePhone(phoneNumber)
 	return fmt.Sprintf(`
@@ -269,7 +298,6 @@ func buildActivationEmail(tenantName, phoneNumber string) string {
 }
 
 func sanitizePhone(phone string) string {
-	// Remover +, espacios y guiones para el enlace wa.me
 	result := ""
 	for _, ch := range phone {
 		if ch >= '0' && ch <= '9' {
@@ -277,10 +305,6 @@ func sanitizePhone(phone string) string {
 		}
 	}
 	return result
-}
-
-func (uc *UseCases) GetTemplates() map[string][]ServiceTemplate {
-	return Templates
 }
 
 func buildOwnerRequestEmail(tenantName string) string {
@@ -301,13 +325,3 @@ func buildAdminNotificationEmail(tenantName, contactEmail, notes string) string 
 		<p><strong>Notas:</strong> %s</p>
 	`, tenantName, contactEmail, notes)
 }
-
-var (
-	ErrStepNotAvailable = onboardingError("step not available yet")
-	ErrServicesRequired = onboardingError("at least one service is required")
-	ErrBarberRequired   = onboardingError("complete the barber step first")
-)
-
-type onboardingError string
-
-func (e onboardingError) Error() string { return string(e) }
