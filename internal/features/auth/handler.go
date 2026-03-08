@@ -7,6 +7,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const refreshTokenMaxAge = 7 * 24 * 3600 // 7 days in seconds
+
+// setTokenCookies writes the access and refresh tokens as HttpOnly, Secure,
+// SameSite=Strict cookies. The access token is scoped to /api/v1 and the
+// refresh token is scoped to /api/v1/auth/refresh to limit exposure.
+func setTokenCookies(c *gin.Context, pair *TokenPair) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("accessToken", pair.AccessToken, pair.ExpiresIn, "/api/v1", "", true, true)
+	c.SetCookie("refreshToken", pair.RefreshToken, refreshTokenMaxAge, "/api/v1/auth/refresh", "", true, true)
+}
+
+// clearTokenCookies expires both auth cookies, used on logout.
+func clearTokenCookies(c *gin.Context) {
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("accessToken", "", -1, "/api/v1", "", true, true)
+	c.SetCookie("refreshToken", "", -1, "/api/v1/auth/refresh", "", true, true)
+}
+
 // Handler handles HTTP requests for the /api/v1/auth endpoints.
 type Handler struct {
 	useCases *UseCases
@@ -71,6 +89,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
+	setTokenCookies(c, output.Tokens)
 	c.JSON(http.StatusCreated, gin.H{
 		"tenant": gin.H{
 			"id":   output.Tenant.ID,
@@ -107,6 +126,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
+	setTokenCookies(c, pair)
 	c.JSON(http.StatusOK, gin.H{
 		"tenant": gin.H{
 			"id":   tenant.ID,
@@ -149,6 +169,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 		return
 	}
 
+	setTokenCookies(c, pair)
 	c.JSON(http.StatusOK, gin.H{
 		"tenant": gin.H{
 			"id":   tenant.ID,
@@ -174,6 +195,7 @@ func (h *Handler) Logout(c *gin.Context) {
 	}
 
 	h.useCases.Logout(c.Request.Context(), req.RefreshToken)
+	clearTokenCookies(c)
 	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
 }
 
