@@ -45,68 +45,68 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 // ── Request / Response ────────────────────────────────────────────
 
 type createResourceRequest struct {
-	Name      string `json:"name"       binding:"required,min=2"`
-	Type      string `json:"type"       binding:"required"`
-	AvatarURL string `json:"avatar_url"`
+	Name      string `json:"name"      binding:"required,min=2"`
+	Type      string `json:"type"      binding:"required"`
+	AvatarURL string `json:"avatarUrl"`
 }
 
 type updateResourceRequest struct {
-	Name      string `json:"name"       binding:"required,min=2"`
-	Type      string `json:"type"       binding:"required"`
-	AvatarURL string `json:"avatar_url"`
-	SortOrder int    `json:"sort_order"`
+	Name      string `json:"name"      binding:"required,min=2"`
+	Type      string `json:"type"      binding:"required"`
+	AvatarURL string `json:"avatarUrl"`
+	SortOrder int    `json:"sortOrder"`
 }
 
 type sortOrderRequest struct {
 	Order []struct {
-		ID        uuid.UUID `json:"id"         binding:"required"`
-		SortOrder int       `json:"sort_order"`
+		ID        uuid.UUID `json:"id"        binding:"required"`
+		SortOrder int       `json:"sortOrder"`
 	} `json:"order" binding:"required,min=1"`
 }
 
 type upsertWorkingHoursRequest struct {
-	DayOfWeek int    `json:"day_of_week" binding:"min=0,max=6"`
-	StartTime string `json:"start_time"  binding:"required"`
-	EndTime   string `json:"end_time"    binding:"required"`
-	IsActive  bool   `json:"is_active"`
+	DayOfWeek int    `json:"dayOfWeek" binding:"min=0,max=6"`
+	StartTime string `json:"startTime" binding:"required"`
+	EndTime   string `json:"endTime"   binding:"required"`
+	IsActive  bool   `json:"isActive"`
 }
 
 type createOverrideRequest struct {
-	Date      string  `json:"date"       binding:"required"` // "2025-03-15"
-	IsDayOff  bool    `json:"is_day_off"`
-	StartTime *string `json:"start_time"`
-	EndTime   *string `json:"end_time"`
+	Date      string  `json:"date"      binding:"required"` // "2025-03-15"
+	IsDayOff  bool    `json:"isDayOff"`
+	StartTime *string `json:"startTime"`
+	EndTime   *string `json:"endTime"`
 	Reason    string  `json:"reason"`
 }
 
 type assignServicesRequest struct {
-	ServiceIDs []uuid.UUID `json:"service_ids" binding:"required"`
+	ServiceIDs []uuid.UUID `json:"serviceIds" binding:"required"`
 }
 
 type resourceResponse struct {
 	ID           uuid.UUID              `json:"id"`
 	Name         string                 `json:"name"`
 	Type         string                 `json:"type"`
-	AvatarURL    string                 `json:"avatar_url"`
-	SortOrder    int                    `json:"sort_order"`
-	WorkingHours []workingHoursResponse `json:"working_hours"`
+	AvatarURL    string                 `json:"avatarUrl"`
+	SortOrder    int                    `json:"sortOrder"`
+	WorkingHours []workingHoursResponse `json:"workingHours"`
 }
 
 type workingHoursResponse struct {
 	ID        uuid.UUID `json:"id"`
-	DayOfWeek int       `json:"day_of_week"`
-	DayName   string    `json:"day_name"`
-	StartTime string    `json:"start_time"`
-	EndTime   string    `json:"end_time"`
-	IsActive  bool      `json:"is_active"`
+	DayOfWeek int       `json:"dayOfWeek"`
+	DayName   string    `json:"dayName"`
+	StartTime string    `json:"startTime"`
+	EndTime   string    `json:"endTime"`
+	IsActive  bool      `json:"isActive"`
 }
 
 type overrideResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Date      string    `json:"date"`
-	IsDayOff  bool      `json:"is_day_off"`
-	StartTime *string   `json:"start_time"`
-	EndTime   *string   `json:"end_time"`
+	IsDayOff  bool      `json:"isDayOff"`
+	StartTime *string   `json:"startTime"`
+	EndTime   *string   `json:"endTime"`
 	Reason    string    `json:"reason"`
 }
 
@@ -471,7 +471,7 @@ func (h *Handler) GetServices(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"service_ids": serviceIDs})
+	c.JSON(http.StatusOK, gin.H{"serviceIds": serviceIDs})
 }
 
 func isValidationError(err error) bool {

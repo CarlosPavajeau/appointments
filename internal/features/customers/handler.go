@@ -29,10 +29,10 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 
 type customerResponse struct {
 	ID          uuid.UUID `json:"id"`
-	PhoneNumber string    `json:"phone_number"`
+	PhoneNumber string    `json:"phoneNumber"`
 	Name        *string   `json:"name"`
-	DisplayName string    `json:"display_name"`
-	IsBlocked   bool      `json:"is_blocked"`
+	DisplayName string    `json:"displayName"`
+	IsBlocked   bool      `json:"isBlocked"`
 }
 
 func toResponse(c Customer) customerResponse {

@@ -30,16 +30,16 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 }
 
 type updateSettingsRequest struct {
-	WelcomeMessage  string `json:"welcome_message"`
-	BotName         string `json:"bot_name"`
-	CancellationMsg string `json:"cancellation_message"`
+	WelcomeMessage  string `json:"welcomeMessage"`
+	BotName         string `json:"botName"`
+	CancellationMsg string `json:"cancellationMessage"`
 }
 
 type connectWhatsappRequest struct {
-	WabaID             string `json:"waba_id"              binding:"required"`
-	PhoneNumberID      string `json:"phone_number_id"      binding:"required"`
-	DisplayPhoneNumber string `json:"display_phone_number" binding:"required"`
-	AccessToken        string `json:"access_token"         binding:"required"`
+	WabaID             string `json:"wabaId"             binding:"required"`
+	PhoneNumberID      string `json:"phoneNumberId"      binding:"required"`
+	DisplayPhoneNumber string `json:"displayPhoneNumber" binding:"required"`
+	AccessToken        string `json:"accessToken"        binding:"required"`
 }
 
 func (h *Handler) UpdateSettings(c *gin.Context) {
@@ -83,8 +83,8 @@ func (h *Handler) ConnectWhatsapp(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"phone_number_id":      cfg.PhoneNumberID,
-		"display_phone_number": cfg.DisplayPhoneNumber,
-		"is_active":            cfg.IsActive,
+		"phoneNumberId":      cfg.PhoneNumberID,
+		"displayPhoneNumber": cfg.DisplayPhoneNumber,
+		"isActive":           cfg.IsActive,
 	})
 }

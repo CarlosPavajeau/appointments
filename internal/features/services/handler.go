@@ -30,26 +30,26 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 }
 
 type createRequest struct {
-	Name            string  `json:"name"             binding:"required,min=2"`
+	Name            string  `json:"name"            binding:"required,min=2"`
 	Description     string  `json:"description"`
-	DurationMinutes int     `json:"duration_minutes" binding:"required,min=1"`
-	BufferMinutes   int     `json:"buffer_minutes"`
-	Price           float64 `json:"price"            binding:"required,min=0"`
+	DurationMinutes int     `json:"durationMinutes" binding:"required,min=1"`
+	BufferMinutes   int     `json:"bufferMinutes"`
+	Price           float64 `json:"price"           binding:"required,min=0"`
 }
 
 type updateRequest struct {
-	Name            string  `json:"name"             binding:"required,min=2"`
+	Name            string  `json:"name"            binding:"required,min=2"`
 	Description     string  `json:"description"`
-	DurationMinutes int     `json:"duration_minutes" binding:"required,min=1"`
-	BufferMinutes   int     `json:"buffer_minutes"`
-	Price           float64 `json:"price"            binding:"required,min=0"`
-	SortOrder       int     `json:"sort_order"`
+	DurationMinutes int     `json:"durationMinutes" binding:"required,min=1"`
+	BufferMinutes   int     `json:"bufferMinutes"`
+	Price           float64 `json:"price"           binding:"required,min=0"`
+	SortOrder       int     `json:"sortOrder"`
 }
 
 type sortOrderRequest struct {
 	Order []struct {
-		ID        uuid.UUID `json:"id"         binding:"required"`
-		SortOrder int       `json:"sort_order" binding:"required"`
+		ID        uuid.UUID `json:"id"        binding:"required"`
+		SortOrder int       `json:"sortOrder" binding:"required"`
 	} `json:"order" binding:"required,min=1"`
 }
 
@@ -57,11 +57,11 @@ type serviceResponse struct {
 	ID              uuid.UUID `json:"id"`
 	Name            string    `json:"name"`
 	Description     string    `json:"description"`
-	DurationMinutes int       `json:"duration_minutes"`
-	BufferMinutes   int       `json:"buffer_minutes"`
-	TotalMinutes    int       `json:"total_minutes"`
+	DurationMinutes int       `json:"durationMinutes"`
+	BufferMinutes   int       `json:"bufferMinutes"`
+	TotalMinutes    int       `json:"totalMinutes"`
 	Price           float64   `json:"price"`
-	SortOrder       int       `json:"sort_order"`
+	SortOrder       int       `json:"sortOrder"`
 }
 
 func toResponse(s Service) serviceResponse {

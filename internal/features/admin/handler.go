@@ -32,10 +32,10 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 }
 
 type activateRequest struct {
-	PhoneNumberID      string `json:"phone_number_id"      binding:"required"`
-	DisplayPhoneNumber string `json:"display_phone_number" binding:"required"`
-	WABAID             string `json:"waba_id"              binding:"required"`
-	AccessToken        string `json:"access_token"         binding:"required"`
+	PhoneNumberID      string `json:"phoneNumberId"      binding:"required"`
+	DisplayPhoneNumber string `json:"displayPhoneNumber" binding:"required"`
+	WABAID             string `json:"wabaId"             binding:"required"`
+	AccessToken        string `json:"accessToken"        binding:"required"`
 }
 
 // ListActivations returns all tenants pending WhatsApp activation.

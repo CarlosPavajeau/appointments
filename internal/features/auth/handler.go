@@ -44,11 +44,11 @@ type loginRequest struct {
 }
 
 type refreshRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 type logoutRequest struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+	RefreshToken string `json:"refreshToken" binding:"required"`
 }
 
 // Register creates a new tenant and admin user, returning an initial token pair.
@@ -78,10 +78,10 @@ func (h *Handler) Register(c *gin.Context) {
 			"slug": output.Tenant.Slug,
 			"plan": output.Tenant.Plan,
 		},
-		"access_token":  output.Tokens.AccessToken,
-		"refresh_token": output.Tokens.RefreshToken,
-		"expires_in":    output.Tokens.ExpiresIn,
-		"token_type":    "Bearer",
+		"accessToken":  output.Tokens.AccessToken,
+		"refreshToken": output.Tokens.RefreshToken,
+		"expiresIn":    output.Tokens.ExpiresIn,
+		"tokenType":    "Bearer",
 	})
 }
 
@@ -114,10 +114,10 @@ func (h *Handler) Login(c *gin.Context) {
 			"slug": tenant.Slug,
 			"plan": tenant.Plan,
 		},
-		"access_token":  pair.AccessToken,
-		"refresh_token": pair.RefreshToken,
-		"expires_in":    pair.ExpiresIn,
-		"token_type":    "Bearer",
+		"accessToken":  pair.AccessToken,
+		"refreshToken": pair.RefreshToken,
+		"expiresIn":    pair.ExpiresIn,
+		"tokenType":    "Bearer",
 	})
 }
 
@@ -156,10 +156,10 @@ func (h *Handler) Refresh(c *gin.Context) {
 			"slug": tenant.Slug,
 			"plan": tenant.Plan,
 		},
-		"access_token":  pair.AccessToken,
-		"refresh_token": pair.RefreshToken,
-		"expires_in":    pair.ExpiresIn,
-		"token_type":    "Bearer",
+		"accessToken":  pair.AccessToken,
+		"refreshToken": pair.RefreshToken,
+		"expiresIn":    pair.ExpiresIn,
+		"tokenType":    "Bearer",
 	})
 }
 

@@ -39,17 +39,17 @@ func (h *Handler) RegisterRoutes(r gin.IRouter) {
 }
 
 type stepBarberRequest struct {
-	Name        string `json:"name"         binding:"required,min=2"`
-	WorkingDays []int  `json:"working_days" binding:"required,min=1"`
-	StartTime   string `json:"start_time"   binding:"required"`
-	EndTime     string `json:"end_time"     binding:"required"`
+	Name        string `json:"name"        binding:"required,min=2"`
+	WorkingDays []int  `json:"workingDays" binding:"required,min=1"`
+	StartTime   string `json:"startTime"   binding:"required"`
+	EndTime     string `json:"endTime"     binding:"required"`
 }
 
 type stepServiceItemRequest struct {
-	Name            string  `json:"name"             binding:"required,min=2"`
-	DurationMinutes int     `json:"duration_minutes" binding:"required,min=1"`
-	BufferMinutes   int     `json:"buffer_minutes"`
-	Price           float64 `json:"price"            binding:"required,min=0"`
+	Name            string  `json:"name"            binding:"required,min=2"`
+	DurationMinutes int     `json:"durationMinutes" binding:"required,min=1"`
+	BufferMinutes   int     `json:"bufferMinutes"`
+	Price           float64 `json:"price"           binding:"required,min=0"`
 }
 
 type stepServicesRequest struct {
@@ -57,7 +57,7 @@ type stepServicesRequest struct {
 }
 
 type stepWhatsAppRequest struct {
-	ContactEmail string `json:"contact_email" binding:"required,email"`
+	ContactEmail string `json:"contactEmail" binding:"required,email"`
 	Notes        string `json:"notes"`
 }
 
@@ -71,8 +71,8 @@ func (h *Handler) GetProgress(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"current_step": progress.CurrentStep,
-		"is_completed": progress.IsCompleted(),
+		"currentStep": progress.CurrentStep,
+		"isCompleted": progress.IsCompleted(),
 	})
 }
 
@@ -101,7 +101,7 @@ func (h *Handler) CompleteStepBarber(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"next_step": StepServices})
+	c.JSON(http.StatusOK, gin.H{"nextStep": StepServices})
 }
 
 func (h *Handler) CompleteStepServices(c *gin.Context) {
@@ -132,7 +132,7 @@ func (h *Handler) CompleteStepServices(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"next_step": StepWhatsApp})
+	c.JSON(http.StatusOK, gin.H{"nextStep": StepWhatsApp})
 }
 
 func (h *Handler) CompleteStepWhatsApp(c *gin.Context) {
