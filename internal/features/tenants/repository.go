@@ -25,7 +25,7 @@ type Repository interface {
 	CreateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	UpdateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	CreateWhatsappConfigPending(ctx context.Context, input CreateWhatsappConfigPendingInput) error
-	FindPendingActivations(ctx context.Context) ([]WhatsappConfig, error)
+	FindPendingActivations(ctx context.Context) ([]PendingActivation, error)
 	ActivateWhatsappConfig(ctx context.Context, input ActivateWhatsappConfigInput) error
 }
 
@@ -287,11 +287,11 @@ func (r *pgRepository) CreateWhatsappConfigPending(ctx context.Context, input Cr
 	return err
 }
 
-func (r *pgRepository) FindPendingActivations(ctx context.Context) ([]WhatsappConfig, error) {
+func (r *pgRepository) FindPendingActivations(ctx context.Context) ([]PendingActivation, error) {
 	var rows []struct {
-		ID                    uuid.UUID  `db:"id"`
 		TenantID              uuid.UUID  `db:"tenant_id"`
 		TenantName            string     `db:"tenant_name"`
+		ContactEmail          string     `db:"contact_email"`
 		ActivationStatus      string     `db:"activation_status"`
 		ActivationRequestedAt *time.Time `db:"activation_requested_at"`
 		ActivationNotes       string     `db:"activation_notes"`
@@ -299,12 +299,12 @@ func (r *pgRepository) FindPendingActivations(ctx context.Context) ([]WhatsappCo
 
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT
-			wc.id,
 			wc.tenant_id,
-			t.name AS tenant_name,
+			t.name                                   AS tenant_name,
+			COALESCE(t.settings->>'contact_email', '') AS contact_email,
 			wc.activation_status,
 			wc.activation_requested_at,
-			COALESCE(wc.activation_notes, '') AS activation_notes
+			COALESCE(wc.activation_notes, '')        AS activation_notes
 		FROM tenant_whatsapp_configs wc
 		JOIN tenants t ON t.id = wc.tenant_id
 		WHERE wc.activation_status = 'pending'
@@ -314,12 +314,19 @@ func (r *pgRepository) FindPendingActivations(ctx context.Context) ([]WhatsappCo
 		return nil, err
 	}
 
-	result := make([]WhatsappConfig, len(rows))
+	result := make([]PendingActivation, len(rows))
 	for i, row := range rows {
-		result[i] = WhatsappConfig{
-			ID:               row.ID,
-			TenantID:         row.TenantID,
-			ActivationStatus: row.ActivationStatus,
+		requestedAt := time.Time{}
+		if row.ActivationRequestedAt != nil {
+			requestedAt = *row.ActivationRequestedAt
+		}
+		result[i] = PendingActivation{
+			TenantID:     row.TenantID,
+			TenantName:   row.TenantName,
+			ContactEmail: row.ContactEmail,
+			Notes:        row.ActivationNotes,
+			Status:       row.ActivationStatus,
+			RequestedAt:  requestedAt,
 		}
 	}
 	return result, nil

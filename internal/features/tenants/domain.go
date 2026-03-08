@@ -51,6 +51,15 @@ type WhatsappConfig struct {
 	UpdatedAt          time.Time
 }
 
+type PendingActivation struct {
+	TenantID     uuid.UUID
+	TenantName   string
+	ContactEmail string
+	Notes        string
+	Status       string
+	RequestedAt  time.Time
+}
+
 type TenantUser struct {
 	ID           uuid.UUID
 	TenantID     uuid.UUID

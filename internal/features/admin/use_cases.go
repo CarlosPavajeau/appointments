@@ -14,7 +14,7 @@ import (
 type TenantService interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*tenants.Tenant, error)
 	ActivateWhatsappConfig(ctx context.Context, input tenants.ActivateWhatsappConfigInput) error
-	FindPendingActivations(ctx context.Context) ([]tenants.WhatsappConfig, error)
+	FindPendingActivations(ctx context.Context) ([]tenants.PendingActivation, error)
 }
 
 type UseCases struct {
@@ -30,8 +30,24 @@ func NewUseCases(tenantService TenantService, mailer mailer.Mailer) *UseCases {
 }
 
 // ListActivations returns all tenants pending WhatsApp activation.
-func (uc *UseCases) ListActivations(ctx context.Context) ([]tenants.WhatsappConfig, error) {
-	return uc.tenantService.FindPendingActivations(ctx)
+func (uc *UseCases) ListActivations(ctx context.Context) ([]Activation, error) {
+	pending, err := uc.tenantService.FindPendingActivations(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Activation, len(pending))
+	for i, p := range pending {
+		result[i] = Activation{
+			TenantID:     p.TenantID,
+			TenantName:   p.TenantName,
+			ContactEmail: p.ContactEmail,
+			Notes:        p.Notes,
+			Status:       ActivationStatus(p.Status),
+			RequestedAt:  p.RequestedAt,
+		}
+	}
+	return result, nil
 }
 
 type ActivateTenantInput struct {

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	"appointments/internal/shared/jwt"
 
@@ -31,6 +32,15 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	}
 }
 
+type activationResponse struct {
+	TenantID     uuid.UUID `json:"tenantId"`
+	TenantName   string    `json:"tenantName"`
+	ContactEmail string    `json:"contactEmail"`
+	Notes        string    `json:"notes"`
+	Status       string    `json:"status"`
+	RequestedAt  string    `json:"requestedAt"`
+}
+
 type activateRequest struct {
 	PhoneNumberID      string `json:"phoneNumberId"      binding:"required"`
 	DisplayPhoneNumber string `json:"displayPhoneNumber" binding:"required"`
@@ -47,7 +57,19 @@ func (h *Handler) ListActivations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"activations": activations})
+	result := make([]activationResponse, len(activations))
+	for i, a := range activations {
+		result[i] = activationResponse{
+			TenantID:     a.TenantID,
+			TenantName:   a.TenantName,
+			ContactEmail: a.ContactEmail,
+			Notes:        a.Notes,
+			Status:       string(a.Status),
+			RequestedAt:  a.RequestedAt.Format(time.RFC3339),
+		}
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // ActivateTenant activates the WhatsApp config for a given tenant.
