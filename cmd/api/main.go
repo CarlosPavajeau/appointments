@@ -49,7 +49,7 @@ func main() {
 	appointmentRepo := scheduling.NewAppointmentRepository(db)
 	availabilityRepo := scheduling.NewAvailabilityRepository(db)
 	refreshTokenRepo := auth.NewRefreshTokenRepository(db)
-	userRepo := users.NewRepository(db, encKey)
+	userRepo := users.NewRepository(db)
 	onboardingRepo := onboarding.NewRepository(db)
 
 	// ── Use Cases ────────────────────────────────────────

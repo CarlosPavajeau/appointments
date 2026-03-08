@@ -18,14 +18,12 @@ type Repository interface {
 }
 
 type pgRepository struct {
-	db            *sqlx.DB
-	encryptionKey []byte
+	db *sqlx.DB
 }
 
-func NewRepository(db *sqlx.DB, encryptionKey []byte) Repository {
+func NewRepository(db *sqlx.DB) Repository {
 	return &pgRepository{
-		db:            db,
-		encryptionKey: encryptionKey,
+		db: db,
 	}
 }
 
