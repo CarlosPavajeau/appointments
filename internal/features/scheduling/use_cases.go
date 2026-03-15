@@ -1,14 +1,14 @@
 package scheduling
 
 import (
-	appointmentspkg "wappiz/internal/features/appointments"
-	"wappiz/internal/features/customers"
-	"wappiz/internal/features/resources"
-	"wappiz/internal/features/services"
 	"context"
 	"errors"
 	"fmt"
 	"time"
+	"wappiz/internal/features/appointments"
+	"wappiz/internal/features/customers"
+	"wappiz/internal/features/resources"
+	"wappiz/internal/features/services"
 
 	"wappiz/internal/features/tenants"
 	apperrors "wappiz/internal/shared/errors"
@@ -18,11 +18,11 @@ import (
 
 // AppointmentService defines the appointment operations needed by scheduling.
 type AppointmentService interface {
-	Create(ctx context.Context, input *appointmentspkg.CreateAppointmentInput) (*appointmentspkg.Appointment, error)
-	GetByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]appointmentspkg.Appointment, error)
-	GetByID(ctx context.Context, id, tenantID uuid.UUID) (*appointmentspkg.Appointment, error)
+	Create(ctx context.Context, input *appointments.CreateAppointmentInput) (*appointments.Appointment, error)
+	GetByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]appointments.Appointment, error)
+	GetByID(ctx context.Context, id, tenantID uuid.UUID) (*appointments.Appointment, error)
 	Cancel(ctx context.Context, id uuid.UUID, cancelledBy, reason string) error
-	GetUpcomingForReminders(ctx context.Context) ([]appointmentspkg.Appointment, error)
+	GetUpcomingForReminders(ctx context.Context) ([]appointments.Appointment, error)
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
 }
 
@@ -33,13 +33,13 @@ const (
 )
 
 type UseCases struct {
-	sessions        SessionRepository
-	appointmentSvc  AppointmentService
-	services        services.Repository
-	resources       resources.Repository
-	customers       customers.Repository
-	slotFinder      *SlotFinder
-	tenantRepo      tenants.Repository
+	sessions       SessionRepository
+	appointmentSvc AppointmentService
+	services       services.Repository
+	resources      resources.Repository
+	customers      customers.Repository
+	slotFinder     *SlotFinder
+	tenantRepo     tenants.Repository
 }
 
 func NewUseCases(
@@ -203,7 +203,7 @@ func (uc *UseCases) validateForAnyResource(ctx context.Context, t time.Time, ten
 	return &DateValidationResult{StartsAt: t, SlotTaken: true, Slots: allSuggestions}, nil
 }
 
-func (uc *UseCases) CreateAppointment(ctx context.Context, session *Session, tenantTZ string) (*appointmentspkg.Appointment, error) {
+func (uc *UseCases) CreateAppointment(ctx context.Context, session *Session, tenantTZ string) (*appointments.Appointment, error) {
 	tenant, err := uc.tenantRepo.FindByID(ctx, session.TenantID)
 	if err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (uc *UseCases) CreateAppointment(ctx context.Context, session *Session, ten
 	startsAt := *session.Data.StartsAt
 	endsAt := startsAt.Add(time.Duration(service.DurationMinutes) * time.Minute)
 
-	a, err := uc.appointmentSvc.Create(ctx, &appointmentspkg.CreateAppointmentInput{
+	a, err := uc.appointmentSvc.Create(ctx, &appointments.CreateAppointmentInput{
 		TenantID:       session.TenantID,
 		ResourceID:     *session.Data.ResourceID,
 		ServiceID:      *session.Data.ServiceID,

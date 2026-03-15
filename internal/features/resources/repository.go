@@ -1,8 +1,8 @@
 package resources
 
 import (
-	"wappiz/internal/platform/database"
 	"context"
+	"wappiz/internal/platform/database"
 
 	"time"
 
@@ -13,7 +13,6 @@ import (
 )
 
 type Repository interface {
-	// Resources
 	FindByTenant(ctx context.Context, tenantID uuid.UUID) ([]Resource, error)
 	FindByTenantAndService(ctx context.Context, tenantID, serviceID uuid.UUID) ([]Resource, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Resource, error)
@@ -22,18 +21,15 @@ type Repository interface {
 	Delete(ctx context.Context, id, tenantID uuid.UUID) error
 	UpdateSortOrder(ctx context.Context, tenantID uuid.UUID, order []SortItem) error
 
-	// Working Hours
 	FindWorkingHours(ctx context.Context, resourceID uuid.UUID) ([]WorkingHours, error)
 	UpsertWorkingHours(ctx context.Context, wh WorkingHours) error
 	DeleteWorkingHours(ctx context.Context, id, resourceID uuid.UUID) error
 
-	// Schedule Overrides
 	FindOverrides(ctx context.Context, resourceID uuid.UUID, from, to time.Time) ([]ScheduleOverride, error)
 	FindOverrideByDate(ctx context.Context, resourceID uuid.UUID, date time.Time) (*ScheduleOverride, error)
 	CreateOverride(ctx context.Context, so *ScheduleOverride) error
 	DeleteOverride(ctx context.Context, id, resourceID uuid.UUID) error
 
-	// Resource — Services (tabla resource_services)
 	AssignServices(ctx context.Context, resourceID uuid.UUID, serviceIDs []uuid.UUID) error
 	FindServiceIDs(ctx context.Context, resourceID uuid.UUID) ([]uuid.UUID, error)
 }

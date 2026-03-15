@@ -1,13 +1,13 @@
 package tenants
 
 import (
-	"wappiz/internal/platform/database"
-	"wappiz/internal/shared/crypto"
-	apperrors "wappiz/internal/shared/errors"
 	"context"
 	"encoding/json"
 	"fmt"
 	"time"
+	"wappiz/internal/platform/database"
+	"wappiz/internal/shared/crypto"
+	apperrors "wappiz/internal/shared/errors"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"

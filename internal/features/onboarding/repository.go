@@ -1,9 +1,9 @@
 package onboarding
 
 import (
-	"wappiz/internal/platform/database"
 	"context"
 	"time"
+	"wappiz/internal/platform/database"
 
 	apperrors "wappiz/internal/shared/errors"
 

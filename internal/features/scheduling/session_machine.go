@@ -1,16 +1,16 @@
 package scheduling
 
 import (
-	appointmentspkg "wappiz/internal/features/appointments"
-	"wappiz/internal/features/customers"
-	"wappiz/internal/features/resources"
-	"wappiz/internal/features/tenants"
 	"context"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"time"
+	"wappiz/internal/features/appointments"
+	"wappiz/internal/features/customers"
+	"wappiz/internal/features/resources"
+	"wappiz/internal/features/tenants"
 
 	"wappiz/internal/platform/whatsapp"
 	apperrors "wappiz/internal/shared/errors"
@@ -676,7 +676,7 @@ func (sm *StateMachine) sendConfirmation(ctx context.Context, msg IncomingMessag
 	return sm.wa.SendButtons(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body, buttons)
 }
 
-func (sm *StateMachine) sendAppointmentConfirmed(ctx context.Context, msg IncomingMessage, a *appointmentspkg.Appointment, customer *customers.Customer, session *Session) error {
+func (sm *StateMachine) sendAppointmentConfirmed(ctx context.Context, msg IncomingMessage, a *appointments.Appointment, customer *customers.Customer, session *Session) error {
 	svc, _ := sm.useCases.services.FindByID(ctx, a.ServiceID)
 	res, _ := sm.useCases.resources.FindByID(ctx, a.ResourceID)
 	tenant, _ := sm.tenantRepo.FindByID(ctx, session.TenantID)

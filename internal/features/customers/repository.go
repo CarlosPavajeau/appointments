@@ -1,8 +1,8 @@
 package customers
 
 import (
-	"wappiz/internal/platform/database"
 	"context"
+	"wappiz/internal/platform/database"
 
 	"time"
 

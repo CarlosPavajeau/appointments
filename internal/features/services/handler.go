@@ -1,9 +1,9 @@
 package services
 
 import (
-	"wappiz/internal/shared/jwt"
 	"errors"
 	"net/http"
+	"wappiz/internal/shared/jwt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

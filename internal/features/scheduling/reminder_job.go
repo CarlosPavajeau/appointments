@@ -1,15 +1,15 @@
 package scheduling
 
 import (
-	appointmentspkg "wappiz/internal/features/appointments"
-	"wappiz/internal/features/customers"
-	"wappiz/internal/features/resources"
-	"wappiz/internal/features/services"
-	"wappiz/internal/features/tenants"
 	"context"
 	"fmt"
 	"log"
 	"time"
+	"wappiz/internal/features/appointments"
+	"wappiz/internal/features/customers"
+	"wappiz/internal/features/resources"
+	"wappiz/internal/features/services"
+	"wappiz/internal/features/tenants"
 
 	"wappiz/internal/platform/whatsapp"
 )
@@ -76,7 +76,7 @@ func (j *ReminderJob) process(ctx context.Context) error {
 	return nil
 }
 
-func (j *ReminderJob) sendReminder(ctx context.Context, a appointmentspkg.Appointment) error {
+func (j *ReminderJob) sendReminder(ctx context.Context, a appointments.Appointment) error {
 	client, err := j.customers.FindByID(ctx, a.CustomerID)
 	if err != nil {
 		return err

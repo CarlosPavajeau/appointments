@@ -1,10 +1,10 @@
 package users
 
 import (
-	"wappiz/internal/platform/database"
-	apperrors "wappiz/internal/shared/errors"
 	"context"
 	"time"
+	"wappiz/internal/platform/database"
+	apperrors "wappiz/internal/shared/errors"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"

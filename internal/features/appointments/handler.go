@@ -1,9 +1,9 @@
 package appointments
 
 import (
-	"wappiz/internal/shared/jwt"
 	"net/http"
 	"time"
+	"wappiz/internal/shared/jwt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

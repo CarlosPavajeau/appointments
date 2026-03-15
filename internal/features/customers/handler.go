@@ -1,8 +1,8 @@
 package customers
 
 import (
-	"wappiz/internal/shared/jwt"
 	"net/http"
+	"wappiz/internal/shared/jwt"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
