@@ -90,7 +90,7 @@ func (h *Handler) List(c *gin.Context) {
 	for i, s := range svcs {
 		result[i] = toResponse(s)
 	}
-	c.JSON(http.StatusOK, gin.H{"services": result})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) Create(c *gin.Context) {
