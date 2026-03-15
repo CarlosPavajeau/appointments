@@ -74,7 +74,7 @@ func (uc *UseCases) AdvanceSession(ctx context.Context, s *Session) error {
 }
 
 func (uc *UseCases) GetServices(ctx context.Context, tenantID uuid.UUID) ([]services.Service, error) {
-	return uc.services.FindByTenant(ctx, tenantID)
+	return uc.services.FindByTenantWithAssignedResource(ctx, tenantID)
 }
 
 func (uc *UseCases) ValidateService(ctx context.Context, tenantID uuid.UUID, interactiveID *string) (*services.Service, error) {

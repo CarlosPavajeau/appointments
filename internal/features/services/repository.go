@@ -13,6 +13,7 @@ import (
 
 type Repository interface {
 	FindByTenant(ctx context.Context, tenantID uuid.UUID) ([]Service, error)
+	FindByTenantWithAssignedResource(ctx context.Context, tenantID uuid.UUID) ([]Service, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Service, error)
 	FindByTenantAndResource(ctx context.Context, tenantID, resourceID uuid.UUID) ([]Service, error)
 	Create(ctx context.Context, s *Service) error
@@ -68,6 +69,28 @@ func (r *pgRepository) FindByTenant(ctx context.Context, tenantID uuid.UUID) ([]
 		FROM services
 		WHERE tenant_id = $1 AND is_active = true
 		ORDER BY sort_order ASC, created_at ASC
+	`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Service, len(rows))
+	for i, row := range rows {
+		result[i] = row.toDomain()
+	}
+	return result, nil
+}
+
+func (r *pgRepository) FindByTenantWithAssignedResource(ctx context.Context, tenantID uuid.UUID) ([]Service, error) {
+	var rows []serviceRow
+	err := r.db.SelectContext(ctx, &rows, `
+		SELECT DISTINCT s.id, s.tenant_id, s.name, s.description, s.duration_minutes,
+		       s.buffer_minutes, s.price, s.is_active, s.sort_order, s.created_at
+		FROM services s
+		JOIN resource_services rs ON rs.service_id = s.id
+		JOIN resources r ON r.id = rs.resource_id AND r.is_active = true
+		WHERE s.tenant_id = $1 AND s.is_active = true
+		ORDER BY s.sort_order ASC, s.created_at ASC
 	`, tenantID)
 	if err != nil {
 		return nil, err
