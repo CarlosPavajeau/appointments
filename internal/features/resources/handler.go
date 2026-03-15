@@ -158,7 +158,7 @@ func (h *Handler) List(c *gin.Context) {
 	for i, r := range resources {
 		result[i] = toResourceResponse(r)
 	}
-	c.JSON(http.StatusOK, gin.H{"resources": result})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) Create(c *gin.Context) {
