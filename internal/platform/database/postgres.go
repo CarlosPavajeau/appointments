@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -28,12 +29,15 @@ func (t *queryTracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.T
 	if !ok {
 		return
 	}
+
 	elapsed := time.Since(meta.start)
+	elapsedStr := fmt.Sprintf("%.2fms", float64(elapsed.Nanoseconds())/1e6)
 	if data.Err != nil {
-		log.Printf("query failed [%s] sql: %s | error: %v", elapsed, meta.sql, data.Err)
+		log.Printf("[database] query failed [%s] sql: %s | error: %v", elapsedStr, meta.sql, data.Err)
 		return
 	}
-	log.Printf("query executed [%s] sql: %s", elapsed, meta.sql)
+
+	log.Printf("[database] query executed [%s] sql: %s", elapsedStr, meta.sql)
 }
 
 func Connect(url string) *sqlx.DB {
@@ -41,9 +45,10 @@ func Connect(url string) *sqlx.DB {
 	if err != nil {
 		log.Fatalf("failed to parse database url: %v", err)
 	}
-	config.Tracer = &queryTracer{}
 
+	config.Tracer = &queryTracer{}
 	connStr := stdlib.RegisterConnConfig(config)
+
 	db, err := sqlx.Open("pgx", connStr)
 	if err != nil {
 		log.Fatalf("failed to open database connection: %v", err)
