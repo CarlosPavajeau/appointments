@@ -89,3 +89,7 @@ func (uc *UseCases) ActivateWhatsappConfig(ctx context.Context, input ActivateWh
 func (uc *UseCases) FindPendingActivations(ctx context.Context) ([]PendingActivation, error) {
 	return uc.repo.FindPendingActivations(ctx)
 }
+
+func (uc *UseCases) FindPendingActivationByTenantID(ctx context.Context, tenantID uuid.UUID) (*PendingActivation, error) {
+	return uc.repo.FindPendingActivationByTenantID(ctx, tenantID)
+}

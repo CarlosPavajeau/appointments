@@ -16,6 +16,7 @@ type TenantService interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*tenants.Tenant, error)
 	ActivateWhatsappConfig(ctx context.Context, input tenants.ActivateWhatsappConfigInput) error
 	FindPendingActivations(ctx context.Context) ([]tenants.PendingActivation, error)
+	FindPendingActivationByTenantID(ctx context.Context, tenantID uuid.UUID) (*tenants.PendingActivation, error)
 }
 
 type UseCases struct {
@@ -61,9 +62,9 @@ type ActivateTenantInput struct {
 
 // ActivateTenant activates the WhatsApp config for a tenant and notifies the owner.
 func (uc *UseCases) ActivateTenant(ctx context.Context, input ActivateTenantInput) error {
-	tenant, err := uc.tenantService.FindByID(ctx, input.TenantID)
+	pending, err := uc.tenantService.FindPendingActivationByTenantID(ctx, input.TenantID)
 	if err != nil {
-		return fmt.Errorf("find tenant: %w", err)
+		return fmt.Errorf("find pending activation: %w", err)
 	}
 
 	if err := uc.tenantService.ActivateWhatsappConfig(ctx, tenants.ActivateWhatsappConfigInput{
@@ -80,9 +81,9 @@ func (uc *UseCases) ActivateTenant(ctx context.Context, input ActivateTenantInpu
 
 	go func() {
 		err := uc.mailer.Send(bgContext, mailer.Email{
-			To:      tenant.Settings.ContactEmail,
+			To:      pending.ContactEmail,
 			Subject: "🎉 Tu WhatsApp ya está activo — Turnio",
-			Body:    buildActivationEmail(tenant.Name, input.DisplayPhoneNumber),
+			Body:    buildActivationEmail(pending.TenantName, input.DisplayPhoneNumber),
 		})
 		if err != nil {
 			log.Printf("[admin] failed to send email: %v", err)

@@ -26,6 +26,7 @@ type Repository interface {
 	UpdateWhatsappConfig(ctx context.Context, cfg *WhatsappConfig) error
 	CreateWhatsappConfigPending(ctx context.Context, input CreateWhatsappConfigPendingInput) error
 	FindPendingActivations(ctx context.Context) ([]PendingActivation, error)
+	FindPendingActivationByTenantID(ctx context.Context, tenantID uuid.UUID) (*PendingActivation, error)
 	ActivateWhatsappConfig(ctx context.Context, input ActivateWhatsappConfigInput) error
 }
 
@@ -331,6 +332,51 @@ func (r *pgRepository) FindPendingActivations(ctx context.Context) ([]PendingAct
 		}
 	}
 	return result, nil
+}
+
+func (r *pgRepository) FindPendingActivationByTenantID(ctx context.Context, tenantID uuid.UUID) (*PendingActivation, error) {
+	var row struct {
+		TenantID              uuid.UUID  `db:"tenant_id"`
+		TenantName            string     `db:"tenant_name"`
+		ContactEmail          string     `db:"contact_email"`
+		ActivationStatus      string     `db:"activation_status"`
+		ActivationRequestedAt *time.Time `db:"activation_requested_at"`
+		ActivationNotes       string     `db:"activation_notes"`
+	}
+
+	err := r.db.GetContext(ctx, &row, `
+		SELECT
+			wc.tenant_id,
+			t.name                                          AS tenant_name,
+			COALESCE(wc.activation_contact_email, '')       AS contact_email,
+			wc.activation_status,
+			wc.activation_requested_at,
+			COALESCE(wc.activation_notes, '')               AS activation_notes
+		FROM tenant_whatsapp_configs wc
+		JOIN tenants t ON t.id = wc.tenant_id
+		WHERE wc.tenant_id = $1
+		LIMIT 1
+	`, tenantID)
+
+	if database.IsNotFound(err) {
+		return nil, apperrors.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	requestedAt := time.Time{}
+	if row.ActivationRequestedAt != nil {
+		requestedAt = *row.ActivationRequestedAt
+	}
+	return &PendingActivation{
+		TenantID:     row.TenantID,
+		TenantName:   row.TenantName,
+		ContactEmail: row.ContactEmail,
+		Notes:        row.ActivationNotes,
+		Status:       row.ActivationStatus,
+		RequestedAt:  requestedAt,
+	}, nil
 }
 
 func (r *pgRepository) ActivateWhatsappConfig(ctx context.Context, input ActivateWhatsappConfigInput) error {
