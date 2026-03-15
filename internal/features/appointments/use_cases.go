@@ -71,3 +71,7 @@ func (uc *UseCases) MarkReminderSent(ctx context.Context, id uuid.UUID, reminder
 func (uc *UseCases) GetByDate(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]Appointment, error) {
 	return uc.repository.FindByDate(ctx, tenantID, date)
 }
+
+func (uc *UseCases) GetByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error) {
+	return uc.repository.FindByDateWithDetails(ctx, tenantID, date)
+}

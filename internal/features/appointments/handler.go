@@ -27,9 +27,9 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 
 type appointmentResponse struct {
 	ID             uuid.UUID `json:"id"`
-	ResourceID     uuid.UUID `json:"resourceId"`
-	ServiceID      uuid.UUID `json:"serviceId"`
-	CustomerID     uuid.UUID `json:"customerId"`
+	ResourceName   string    `json:"resourceName"`
+	ServiceName    string    `json:"serviceName"`
+	CustomerName   string    `json:"customerName"`
 	StartsAt       time.Time `json:"startsAt"`
 	EndsAt         time.Time `json:"endsAt"`
 	Status         string    `json:"status"`
@@ -51,7 +51,7 @@ func (h *Handler) ListByDate(c *gin.Context) {
 
 	tenantID := jwt.TenantIDFromContext(c)
 
-	appts, err := h.useCases.GetByDate(c.Request.Context(), tenantID, date)
+	appts, err := h.useCases.GetByDateWithDetails(c.Request.Context(), tenantID, date)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch appointments"})
 		return
@@ -61,9 +61,9 @@ func (h *Handler) ListByDate(c *gin.Context) {
 	for i, a := range appts {
 		result[i] = appointmentResponse{
 			ID:             a.ID,
-			ResourceID:     a.ResourceID,
-			ServiceID:      a.ServiceID,
-			CustomerID:     a.CustomerID,
+			ResourceName:   a.ResourceName,
+			ServiceName:    a.ServiceName,
+			CustomerName:   a.CustomerName,
 			StartsAt:       a.StartsAt,
 			EndsAt:         a.EndsAt,
 			Status:         a.Status,

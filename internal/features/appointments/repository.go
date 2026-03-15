@@ -17,6 +17,7 @@ type Repository interface {
 	FindByCustomerID(ctx context.Context, tenantID, customerID uuid.UUID) ([]Appointment, error)
 	FindUpcomingForReminders(ctx context.Context) ([]Appointment, error)
 	FindByDate(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]Appointment, error)
+	FindByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error)
 
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string) error
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
@@ -219,6 +220,56 @@ func (r *pgAppointmentRepository) FindByDate(ctx context.Context, tenantID uuid.
 			EndsAt:         row.EndsAt,
 			Status:         row.Status,
 			PriceAtBooking: row.PriceAtBooking,
+		}
+	}
+	return result, nil
+}
+
+func (r *pgAppointmentRepository) FindByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error) {
+	dayStart := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	var rows []struct {
+		ID             uuid.UUID `db:"id"`
+		StartsAt       time.Time `db:"starts_at"`
+		EndsAt         time.Time `db:"ends_at"`
+		Status         string    `db:"status"`
+		PriceAtBooking float64   `db:"price_at_booking"`
+		ResourceName   string    `db:"resource_name"`
+		ServiceName    string    `db:"service_name"`
+		CustomerName   string    `db:"customer_name"`
+	}
+
+	err := r.db.SelectContext(ctx, &rows, `
+        SELECT a.id, a.starts_at, a.ends_at, a.status, a.price_at_booking,
+               r.name AS resource_name,
+               s.name AS service_name,
+               COALESCE(c.name, c.phone_number) AS customer_name
+        FROM appointments a
+        JOIN resources  r ON r.id = a.resource_id
+        JOIN services   s ON s.id = a.service_id
+        JOIN customers  c ON c.id = a.customer_id
+        WHERE a.tenant_id = $1
+          AND a.starts_at >= $2 AND a.starts_at < $3
+          AND a.status != 'cancelled'
+        ORDER BY a.starts_at ASC
+    `, tenantID, dayStart, dayEnd)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]AppointmentWithDetails, len(rows))
+	for i, row := range rows {
+		result[i] = AppointmentWithDetails{
+			ID:             row.ID,
+			StartsAt:       row.StartsAt,
+			EndsAt:         row.EndsAt,
+			Status:         row.Status,
+			PriceAtBooking: row.PriceAtBooking,
+			ResourceName:   row.ResourceName,
+			ServiceName:    row.ServiceName,
+			CustomerName:   row.CustomerName,
 		}
 	}
 	return result, nil

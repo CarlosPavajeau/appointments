@@ -17,3 +17,14 @@ type Appointment struct {
 	Status         string
 	PriceAtBooking float64
 }
+
+type AppointmentWithDetails struct {
+	ID             uuid.UUID
+	StartsAt       time.Time
+	EndsAt         time.Time
+	Status         string
+	PriceAtBooking float64
+	ResourceName   string
+	ServiceName    string
+	CustomerName   string
+}
