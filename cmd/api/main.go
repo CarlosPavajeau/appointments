@@ -68,7 +68,7 @@ func main() {
 	adminUC := admin.NewUseCases(tenantUC, resendMailer)
 	authUC := auth.NewUseCases(tenantUC, userUseCases, onboardingUC, refreshTokenRepo)
 	serviceUC := services.NewUseCases(serviceRepo)
-	resourceUC := resources.NewUseCases(resourceRepo)
+	resourceUC := resources.NewUseCases(resourceRepo, serviceRepo)
 	customerUC := customers.NewUseCases(customerRepo)
 
 	schedulingUC := scheduling.NewUseCases(

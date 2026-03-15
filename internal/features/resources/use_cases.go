@@ -4,17 +4,19 @@ import (
 	"context"
 	"time"
 
+	"appointments/internal/features/services"
 	apperrors "appointments/internal/shared/errors"
 
 	"github.com/google/uuid"
 )
 
 type UseCases struct {
-	repo Repository
+	repo        Repository
+	serviceRepo services.Repository
 }
 
-func NewUseCases(repo Repository) *UseCases {
-	return &UseCases{repo: repo}
+func NewUseCases(repo Repository, serviceRepo services.Repository) *UseCases {
+	return &UseCases{repo: repo, serviceRepo: serviceRepo}
 }
 
 // ── Resource CRUD ─────────────────────────────────────────────────
@@ -211,4 +213,11 @@ func (uc *UseCases) GetServiceIDs(ctx context.Context, resourceID, tenantID uuid
 		return nil, err
 	}
 	return uc.repo.FindServiceIDs(ctx, resourceID)
+}
+
+func (uc *UseCases) GetServices(ctx context.Context, resourceID, tenantID uuid.UUID) ([]services.Service, error) {
+	if _, err := uc.GetByID(ctx, resourceID, tenantID); err != nil {
+		return nil, err
+	}
+	return uc.serviceRepo.FindByTenantAndResource(ctx, tenantID, resourceID)
 }

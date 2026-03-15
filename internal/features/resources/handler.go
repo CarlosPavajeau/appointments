@@ -101,6 +101,16 @@ type workingHoursResponse struct {
 	IsActive  bool      `json:"isActive"`
 }
 
+type serviceResponse struct {
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	DurationMinutes int     `json:"durationMinutes"`
+	BufferMinutes   int     `json:"bufferMinutes"`
+	Price           float64 `json:"price"`
+	SortOrder       int     `json:"sortOrder"`
+}
+
 type overrideResponse struct {
 	ID        uuid.UUID `json:"id"`
 	Date      string    `json:"date"`
@@ -465,13 +475,25 @@ func (h *Handler) GetServices(c *gin.Context) {
 
 	tenantID := jwt.TenantIDFromContext(c)
 
-	serviceIDs, err := h.useCases.GetServiceIDs(c.Request.Context(), id, tenantID)
+	svcs, err := h.useCases.GetServices(c.Request.Context(), id, tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch services"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"serviceIds": serviceIDs})
+	result := make([]serviceResponse, len(svcs))
+	for i, s := range svcs {
+		result[i] = serviceResponse{
+			ID:              s.ID.String(),
+			Name:            s.Name,
+			Description:     s.Description,
+			DurationMinutes: s.DurationMinutes,
+			BufferMinutes:   s.BufferMinutes,
+			Price:           s.Price,
+			SortOrder:       s.SortOrder,
+		}
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func isValidationError(err error) bool {
