@@ -2,6 +2,8 @@ package appointments
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 	"wappiz/internal/platform/database"
 	apperrors "wappiz/internal/shared/errors"
@@ -17,7 +19,7 @@ type Repository interface {
 	FindByCustomerID(ctx context.Context, tenantID, customerID uuid.UUID) ([]Appointment, error)
 	FindUpcomingForReminders(ctx context.Context) ([]Appointment, error)
 	FindByDate(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]Appointment, error)
-	FindByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error)
+	Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error)
 
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string) error
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
@@ -225,9 +227,57 @@ func (r *pgAppointmentRepository) FindByDate(ctx context.Context, tenantID uuid.
 	return result, nil
 }
 
-func (r *pgAppointmentRepository) FindByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error) {
+func (r *pgAppointmentRepository) Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error) {
 	dayStart := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	dayEnd := dayStart.Add(24 * time.Hour)
+
+	args := []interface{}{tenantID, dayStart, dayEnd}
+	idx := 4
+
+	var extraClauses []string
+
+	if len(filters.ResourceIDs) > 0 {
+		placeholders := make([]string, len(filters.ResourceIDs))
+		for i, id := range filters.ResourceIDs {
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			args = append(args, id)
+			idx++
+		}
+		extraClauses = append(extraClauses, fmt.Sprintf("a.resource_id IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	if len(filters.ServiceIDs) > 0 {
+		placeholders := make([]string, len(filters.ServiceIDs))
+		for i, id := range filters.ServiceIDs {
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			args = append(args, id)
+			idx++
+		}
+		extraClauses = append(extraClauses, fmt.Sprintf("a.service_id IN (%s)", strings.Join(placeholders, ",")))
+	}
+
+	if filters.CustomerID != nil {
+		extraClauses = append(extraClauses, fmt.Sprintf("a.customer_id = $%d", idx))
+		args = append(args, *filters.CustomerID)
+	}
+
+	query := `
+        SELECT a.id, a.starts_at, a.ends_at, a.status, a.price_at_booking,
+               r.name AS resource_name,
+               s.name AS service_name,
+               COALESCE(c.name, c.phone_number) AS customer_name
+        FROM appointments a
+        JOIN resources  r ON r.id = a.resource_id
+        JOIN services   s ON s.id = a.service_id
+        JOIN customers  c ON c.id = a.customer_id
+        WHERE a.tenant_id = $1
+          AND a.starts_at >= $2 AND a.starts_at < $3
+          AND a.status != 'cancelled'`
+
+	if len(extraClauses) > 0 {
+		query += "\n          AND " + strings.Join(extraClauses, "\n          AND ")
+	}
+	query += "\n        ORDER BY a.starts_at ASC"
 
 	var rows []struct {
 		ID             uuid.UUID `db:"id"`
@@ -240,21 +290,7 @@ func (r *pgAppointmentRepository) FindByDateWithDetails(ctx context.Context, ten
 		CustomerName   string    `db:"customer_name"`
 	}
 
-	err := r.db.SelectContext(ctx, &rows, `
-        SELECT a.id, a.starts_at, a.ends_at, a.status, a.price_at_booking,
-               r.name AS resource_name,
-               s.name AS service_name,
-               COALESCE(c.name, c.phone_number) AS customer_name
-        FROM appointments a
-        JOIN resources  r ON r.id = a.resource_id
-        JOIN services   s ON s.id = a.service_id
-        JOIN customers  c ON c.id = a.customer_id
-        WHERE a.tenant_id = $1
-          AND a.starts_at >= $2 AND a.starts_at < $3
-          AND a.status != 'cancelled'
-        ORDER BY a.starts_at ASC
-    `, tenantID, dayStart, dayEnd)
-
+	err := r.db.SelectContext(ctx, &rows, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -21,7 +21,7 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	g := r.Group("/api/v1/appointments")
 	g.Use(jwt.AuthMiddleware())
 	{
-		g.GET("", h.ListByDate)
+		g.GET("", h.Search)
 	}
 }
 
@@ -36,7 +36,7 @@ type appointmentResponse struct {
 	PriceAtBooking float64   `json:"priceAtBooking"`
 }
 
-func (h *Handler) ListByDate(c *gin.Context) {
+func (h *Handler) Search(c *gin.Context) {
 	dateStr := c.Query("date")
 	if dateStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "date query parameter is required (YYYY-MM-DD)"})
@@ -49,9 +49,14 @@ func (h *Handler) ListByDate(c *gin.Context) {
 		return
 	}
 
+	filters, ok := parseListFilters(c)
+	if !ok {
+		return
+	}
+
 	tenantID := jwt.TenantIDFromContext(c)
 
-	appts, err := h.useCases.GetByDateWithDetails(c.Request.Context(), tenantID, date)
+	appts, err := h.useCases.Search(c.Request.Context(), tenantID, date, filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch appointments"})
 		return
@@ -71,4 +76,37 @@ func (h *Handler) ListByDate(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func parseListFilters(c *gin.Context) (ListFilters, bool) {
+	var filters ListFilters
+
+	for _, raw := range c.QueryArray("resource") {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource ID: " + raw})
+			return filters, false
+		}
+		filters.ResourceIDs = append(filters.ResourceIDs, id)
+	}
+
+	for _, raw := range c.QueryArray("service") {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service ID: " + raw})
+			return filters, false
+		}
+		filters.ServiceIDs = append(filters.ServiceIDs, id)
+	}
+
+	if raw := c.Query("customer"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer ID: " + raw})
+			return filters, false
+		}
+		filters.CustomerID = &id
+	}
+
+	return filters, true
 }

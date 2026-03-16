@@ -72,6 +72,6 @@ func (uc *UseCases) GetByDate(ctx context.Context, tenantID uuid.UUID, date time
 	return uc.repository.FindByDate(ctx, tenantID, date)
 }
 
-func (uc *UseCases) GetByDateWithDetails(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]AppointmentWithDetails, error) {
-	return uc.repository.FindByDateWithDetails(ctx, tenantID, date)
+func (uc *UseCases) Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error) {
+	return uc.repository.Search(ctx, tenantID, date, filters)
 }
