@@ -418,7 +418,7 @@ func (sm *StateMachine) handleMyAppointments(ctx context.Context, msg IncomingMe
 	text := "Tus próximas citas 📋\n\n"
 	for _, a := range appointments {
 		text += fmt.Sprintf("• %s – %s\n",
-			a.StartsAt.Format("02/01 03:04 PM"),
+			fmtTime(a.StartsAt, "02/01 03:04 PM"),
 			a.Status)
 	}
 	text += "\nPara cancelar una cita escribe *cancelar*."
@@ -440,7 +440,7 @@ func (sm *StateMachine) handleCancelFlow(ctx context.Context, msg IncomingMessag
 	for _, a := range appointments {
 		rows = append(rows, whatsapp.ListRow{
 			ID:    "cancel_" + a.ID.String(),
-			Title: a.StartsAt.Format("02/01 03:04 PM"),
+			Title: fmtTime(a.StartsAt, "02/01 03:04 PM"),
 		})
 	}
 
@@ -504,7 +504,7 @@ func (sm *StateMachine) handleCancelConfirm(ctx context.Context, msg IncomingMes
 			"📅 %s\n\n"+
 			"Esta acción no se puede deshacer.",
 		svc.Name, res.Name,
-		appointment.StartsAt.Format("02/01/2006 03:04 PM"),
+		fmtTime(appointment.StartsAt, "02/01/2006 03:04 PM"),
 	)
 
 	buttons := []whatsapp.Button{
@@ -577,7 +577,7 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 				"📅 %s\n\n"+
 				"Escríbenos cuando quieras agendar una nueva cita 👋",
 			svc.Name, res.Name,
-			appointment.StartsAt.Format("02/01/2006 03:04 PM"),
+			fmtTime(appointment.StartsAt, "02/01/2006 03:04 PM"),
 		),
 	)
 }
@@ -634,7 +634,7 @@ func (sm *StateMachine) sendSlotList(ctx context.Context, msg IncomingMessage, s
 	for _, s := range slots {
 		rows = append(rows, whatsapp.ListRow{
 			ID:          buildSlotID(s),
-			Title:       s.StartsAt.Format("02/01 03:04 PM"),
+			Title:       fmtTime(s.StartsAt, "02/01 03:04 PM"),
 			Description: s.ResourceName,
 		})
 	}
@@ -664,7 +664,7 @@ func (sm *StateMachine) sendConfirmation(ctx context.Context, msg IncomingMessag
 		clientName,
 		svc.Name, svc.DurationMinutes,
 		res.Name,
-		session.Data.StartsAt.Format("02/01/2006 03:04 PM"),
+		fmtTime(*session.Data.StartsAt, "02/01/2006 03:04 PM"),
 		formatPrice(svc.Price),
 	)
 
@@ -695,7 +695,7 @@ func (sm *StateMachine) sendAppointmentConfirmed(ctx context.Context, msg Incomi
 			"Si necesitas cancelar escríbenos aquí. ¡Hasta pronto! 👋",
 		name,
 		svc.Name, res.Name,
-		a.StartsAt.Format("02/01/2006 03:04 PM"),
+		fmtTime(a.StartsAt, "02/01/2006 03:04 PM"),
 		tenant.Name,
 	)
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body)
@@ -745,4 +745,16 @@ func parseSlotID(id string) (time.Time, uuid.UUID, error) {
 
 func formatPrice(p float64) string {
 	return fmt.Sprintf("%.0f", p)
+}
+
+var bogotaLoc = func() *time.Location {
+	loc, err := time.LoadLocation("America/Bogota")
+	if err != nil {
+		return time.FixedZone("America/Bogota", -5*60*60)
+	}
+	return loc
+}()
+
+func fmtTime(t time.Time, layout string) string {
+	return t.In(bogotaLoc).Format(layout)
 }
