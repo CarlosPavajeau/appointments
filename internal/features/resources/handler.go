@@ -393,7 +393,7 @@ func (h *Handler) ListOverrides(c *gin.Context) {
 	for i, o := range overrides {
 		result[i] = toOverrideResponse(o)
 	}
-	c.JSON(http.StatusOK, gin.H{"overrides": result})
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) CreateOverride(c *gin.Context) {
