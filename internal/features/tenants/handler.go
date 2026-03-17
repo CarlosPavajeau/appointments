@@ -18,12 +18,14 @@ func NewHandler(uc *UseCases) *Handler {
 
 // RegisterRoutes mounts protected tenant management endpoints.
 //
+//	GET  /api/v1/tenants/me        — get current tenant info
 //	PUT  /api/v1/tenants/settings  — update tenant settings
 //	POST /api/v1/tenants/whatsapp  — connect WhatsApp config
 func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	protected := r.Group("/api/v1/tenants")
 	protected.Use(jwt.AuthMiddleware())
 	{
+		protected.GET("/me", h.GetTenant)
 		protected.PUT("/settings", h.UpdateSettings)
 		protected.POST("/whatsapp", h.ConnectWhatsapp)
 	}
@@ -40,6 +42,25 @@ type connectWhatsappRequest struct {
 	PhoneNumberID      string `json:"phoneNumberId"      binding:"required"`
 	DisplayPhoneNumber string `json:"displayPhoneNumber" binding:"required"`
 	AccessToken        string `json:"accessToken"        binding:"required"`
+}
+
+func (h *Handler) GetTenant(c *gin.Context) {
+	tenantID := jwt.TenantIDFromContext(c)
+	tenant, err := h.useCases.FindByID(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":       tenant.ID,
+		"name":     tenant.Name,
+		"slug":     tenant.Slug,
+		"timezone": tenant.Timezone,
+		"currency": tenant.Currency,
+		"plan":     tenant.Plan,
+		"settings": tenant.Settings,
+	})
 }
 
 func (h *Handler) UpdateSettings(c *gin.Context) {
