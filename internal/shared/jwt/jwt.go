@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -35,11 +36,15 @@ const (
 // Claims holds the JWT payload expected from the external auth service.
 // Field names must match what the external issuer embeds.
 type Claims struct {
-	UserID   string    `json:"id"`
-	TenantID uuid.UUID `json:"tenant_id"`
-	Role     string    `json:"role"`
+	UserID string `json:"id"`
+	Role   string `json:"role"`
 	gojwt.RegisteredClaims
 }
+
+// TenantIDLookup resolves a tenant UUID from a user ID.
+// It is called by AuthMiddleware after token verification to populate the
+// tenant_id context value. Set it via InitTenantFinder at startup.
+type TenantIDLookup func(ctx context.Context, userID string) (uuid.UUID, error)
 
 // ─── JWKS verifier ───────────────────────────────────────────────────────────
 
@@ -255,7 +260,7 @@ func (v *Verifier) VerifyToken(tokenStr string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 
-	log.Printf("[jwt] token valid: user_id=%s tenant_id=%s role=%s", claims.UserID, claims.TenantID, claims.Role)
+	log.Printf("[jwt] token valid: user_id=%s role=%s", claims.UserID, claims.Role)
 	return claims, nil
 }
 
@@ -383,6 +388,14 @@ func isAllowedAlg(alg string) bool {
 // ─── Package-level initialisation ────────────────────────────────────────────
 
 var defaultVerifier *Verifier
+var defaultTenantFinder TenantIDLookup
+
+// InitTenantFinder registers the function used by AuthMiddleware to resolve
+// a tenant UUID from the authenticated user ID. Call this at startup after
+// the tenant use-case is initialised.
+func InitTenantFinder(f TenantIDLookup) {
+	defaultTenantFinder = f
+}
 
 // Init initialises the package-level JWKS verifier.
 // It must be called once at application startup, before any requests are served.
@@ -432,9 +445,19 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("tenant_id", claims.TenantID)
 		c.Set("user_id", claims.UserID)
 		c.Set("role", claims.Role)
+
+		if defaultTenantFinder != nil {
+			tenantID, err := defaultTenantFinder(c.Request.Context(), claims.UserID)
+			if err != nil {
+				log.Printf("[jwt] tenant lookup failed for user_id=%s: %v", claims.UserID, err)
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
+				return
+			}
+			c.Set("tenant_id", tenantID)
+		}
+
 		c.Next()
 	}
 }
