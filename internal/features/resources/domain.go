@@ -115,7 +115,6 @@ func parseTime(t string) (time.Time, error) {
 
 var (
 	ErrNameRequired     = resourceError("name is required")
-	ErrInvalidType      = resourceError("type must be 'barber' or 'chair'")
 	ErrInvalidDayOfWeek = resourceError("day_of_week must be between 0 and 6")
 	ErrInvalidTime      = resourceError("time must be in HH:MM format")
 	ErrStartAfterEnd    = resourceError("start_time must be before end_time")
