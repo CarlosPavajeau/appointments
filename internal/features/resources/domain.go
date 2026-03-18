@@ -11,7 +11,6 @@ type ResourceType string
 
 const (
 	ResourceTypeBarber ResourceType = "barber"
-	ResourceTypeChair  ResourceType = "chair"
 )
 
 type Resource struct {
@@ -58,9 +57,7 @@ func (r *Resource) Validate() error {
 	if r.Name == "" {
 		return ErrNameRequired
 	}
-	if r.Type != ResourceTypeBarber && r.Type != ResourceTypeChair {
-		return ErrInvalidType
-	}
+
 	return nil
 }
 
