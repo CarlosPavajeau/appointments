@@ -16,7 +16,6 @@ import (
 	"wappiz/internal/config"
 	"wappiz/internal/features/admin"
 	"wappiz/internal/features/appointments"
-	"wappiz/internal/features/auth"
 	"wappiz/internal/features/customers"
 	"wappiz/internal/features/onboarding"
 	"wappiz/internal/features/resources"
@@ -27,6 +26,7 @@ import (
 	"wappiz/internal/platform/database"
 	"wappiz/internal/platform/mailer"
 	"wappiz/internal/platform/whatsapp"
+	"wappiz/internal/shared/jwt"
 	"wappiz/internal/shared/middleware"
 )
 
@@ -36,6 +36,14 @@ func main() {
 	encKey := []byte(cfg.EncryptionKey)
 	if len(encKey) != 32 {
 		log.Fatal("ENCRYPTION_KEY must be exactly 32 bytes")
+	}
+
+	// ── Auth ─────────────────────────────────────────────
+	// Initialise the JWKS verifier before any request is served.
+	// This performs an eager fetch so the service fails fast if the external
+	// authentication endpoint is unreachable.
+	if err := jwt.Init(cfg.JWKSEndpoint, cfg.JWTIssuer); err != nil {
+		log.Fatalf("failed to initialise JWT verifier: %v", err)
 	}
 
 	// ── Infra ────────────────────────────────────────────
@@ -51,7 +59,6 @@ func main() {
 	sessionRepo := scheduling.NewSessionRepository(db)
 	appointmentRepo := appointments.NewRepository(db)
 	availabilityRepo := scheduling.NewAvailabilityRepository(db)
-	refreshTokenRepo := auth.NewRefreshTokenRepository(db)
 	userRepo := users.NewRepository(db)
 	onboardingRepo := onboarding.NewRepository(db)
 
@@ -67,7 +74,6 @@ func main() {
 		cfg.AdminEmail,
 	)
 	adminUC := admin.NewUseCases(tenantUC, resendMailer)
-	authUC := auth.NewUseCases(tenantUC, userUseCases, onboardingUC, refreshTokenRepo)
 	serviceUC := services.NewUseCases(serviceRepo)
 	resourceUC := resources.NewUseCases(resourceRepo, serviceRepo)
 	customerUC := customers.NewUseCases(customerRepo)
@@ -104,7 +110,6 @@ func main() {
 
 	// REST API
 	adminHandler := admin.NewHandler(adminUC)
-	authHandler := auth.NewHandler(authUC)
 	tenantHandler := tenants.NewHandler(tenantUC)
 	serviceHandler := services.NewHandler(serviceUC)
 	resourceHandler := resources.NewHandler(resourceUC)
@@ -114,7 +119,6 @@ func main() {
 	appointmentHandler := appointments.NewHandler(appointmentUC)
 
 	adminHandler.RegisterRoutes(r)
-	authHandler.RegisterRoutes(r)
 	tenantHandler.RegisterRoutes(r)
 	serviceHandler.RegisterRoutes(r)
 	resourceHandler.RegisterRoutes(r)
@@ -137,7 +141,7 @@ func main() {
 	)
 	go reminderJob.Run(ctx)
 
-	// Cleanup job — delete expired sessions and refresh tokens every hour
+	// Cleanup job — delete expired sessions every hour
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
@@ -150,12 +154,6 @@ func main() {
 					log.Printf("cleanup sessions error: %v", err)
 				} else if n > 0 {
 					log.Printf("cleanup: deleted %d expired sessions", n)
-				}
-
-				if n, err := refreshTokenRepo.DeleteExpired(context.Background()); err != nil {
-					log.Printf("cleanup refresh tokens error: %v", err)
-				} else if n > 0 {
-					log.Printf("cleanup: deleted %d expired refresh tokens", n)
 				}
 			}
 		}

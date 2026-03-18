@@ -18,6 +18,8 @@ type Config struct {
 	AdminEmail         string
 	ResendAPIKey       string
 	ResendFromEmail    string
+	JWKSEndpoint       string
+	JWTIssuer          string // optional; when set the "iss" claim must match
 }
 
 func Load() *Config {
@@ -36,6 +38,8 @@ func Load() *Config {
 		AdminEmail:         mustGet("ADMIN_EMAIL"),
 		ResendAPIKey:       mustGet("RESEND_API_KEY"),
 		ResendFromEmail:    mustGet("RESEND_FROM_EMAIL"),
+		JWKSEndpoint:       mustGet("JWKS_ENDPOINT"),
+		JWTIssuer:          os.Getenv("JWT_ISSUER"), // optional
 	}
 }
 
