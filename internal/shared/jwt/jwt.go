@@ -445,6 +445,6 @@ func TenantIDFromContext(c *gin.Context) uuid.UUID {
 	return c.MustGet("tenant_id").(uuid.UUID)
 }
 
-func UserIDFromContext(c *gin.Context) uuid.UUID {
-	return c.MustGet("user_id").(uuid.UUID)
+func UserIDFromContext(c *gin.Context) string {
+	return c.MustGet("user_id").(string)
 }

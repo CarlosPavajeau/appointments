@@ -18,6 +18,7 @@ type Repository interface {
 	FindBySlug(ctx context.Context, slug string) (*Tenant, error)
 	Create(ctx context.Context, t *Tenant) error
 	Update(ctx context.Context, t *Tenant) error
+	LinkTenantUser(ctx context.Context, userID string, tenantID uuid.UUID) error
 	IncrementAppointmentCount(ctx context.Context, id uuid.UUID) error
 	ResetAppointmentCount(ctx context.Context, id uuid.UUID) error
 	FindWhatsappConfig(ctx context.Context, tenantID uuid.UUID) (*WhatsappConfig, error)
@@ -116,6 +117,15 @@ func (r *pgRepository) Create(ctx context.Context, t *Tenant) error {
 		VALUES ($1,$2,$3,$4,$5,$6,0,$7,true,$8)
 	`, t.ID, t.Name, t.Slug, t.Timezone, t.Currency, string(t.Plan),
 		firstDayOfNextMonth(), settings)
+	return err
+}
+
+func (r *pgRepository) LinkTenantUser(ctx context.Context, userID string, tenantID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO tenant_users (user_id, tenant_id, role)
+		VALUES ($1, $2, 'admin')
+		ON CONFLICT (user_id, tenant_id) DO NOTHING
+	`, userID, tenantID)
 	return err
 }
 

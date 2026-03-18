@@ -2,8 +2,14 @@ package tenants
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"math/rand"
+	"regexp"
+	"strings"
 	"time"
 
+	"wappiz/internal/platform/database"
 	apperrors "wappiz/internal/shared/errors"
 
 	"github.com/google/uuid"
@@ -15,6 +21,66 @@ type UseCases struct {
 
 func NewUseCases(repo Repository) *UseCases {
 	return &UseCases{repo: repo}
+}
+
+const slugAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+const slugConstraint = "tenants_slug_key"
+const slugMaxRetries = 5
+
+var nonAlphanumeric = regexp.MustCompile(`[^a-z0-9]+`)
+
+func slugify(name string) string {
+	s := strings.ToLower(strings.TrimSpace(name))
+	s = nonAlphanumeric.ReplaceAllString(s, "-")
+	return strings.Trim(s, "-")
+}
+
+func randomSuffix(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = slugAlphabet[rand.Intn(len(slugAlphabet))]
+	}
+	return string(b)
+}
+
+func (uc *UseCases) RegisterTenant(ctx context.Context, name, userID string) (*Tenant, error) {
+	base := slugify(name)
+
+	var tenant *Tenant
+	for attempt := range slugMaxRetries {
+		slug := base
+		if attempt > 0 {
+			slug = fmt.Sprintf("%s-%s", base, randomSuffix(5))
+		}
+
+		t := &Tenant{
+			ID:       uuid.New(),
+			Name:     name,
+			Slug:     slug,
+			Timezone: "America/Bogota",
+			Currency: "COP",
+			Plan:     PlanFree,
+		}
+
+		err := uc.repo.Create(ctx, t)
+		if err == nil {
+			tenant = t
+			break
+		}
+		if !database.IsConstraintError(err, slugConstraint) {
+			return nil, err
+		}
+	}
+
+	if tenant == nil {
+		return nil, errors.New("could not generate a unique slug after retries")
+	}
+
+	if err := uc.repo.LinkTenantUser(ctx, userID, tenant.ID); err != nil {
+		return nil, err
+	}
+
+	return tenant, nil
 }
 
 func (uc *UseCases) FindByID(ctx context.Context, id uuid.UUID) (*Tenant, error) {

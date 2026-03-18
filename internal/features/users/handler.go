@@ -5,6 +5,7 @@ import (
 	"wappiz/internal/shared/jwt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -24,7 +25,11 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 }
 
 func (h *Handler) GetMe(c *gin.Context) {
-	userID := jwt.UserIDFromContext(c)
+	userID, err := uuid.Parse(jwt.UserIDFromContext(c))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
 	user, err := h.useCases.repo.FindByID(c.Request.Context(), userID)
 
 	if err != nil {

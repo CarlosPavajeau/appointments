@@ -110,7 +110,7 @@ func main() {
 
 	// REST API
 	adminHandler := admin.NewHandler(adminUC)
-	tenantHandler := tenants.NewHandler(tenantUC)
+	tenantHandler := tenants.NewHandler(tenantUC, onboardingUC)
 	serviceHandler := services.NewHandler(serviceUC)
 	resourceHandler := resources.NewHandler(resourceUC)
 	customerHandler := customers.NewHandler(customerUC)
