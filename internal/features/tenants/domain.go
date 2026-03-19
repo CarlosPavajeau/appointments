@@ -70,7 +70,7 @@ type TenantUser struct {
 }
 
 var FreemiumLimits = map[Plan]int{
-	PlanFree: 30,
+	PlanFree: 50, // 50 appointments per month
 	PlanPro:  -1, // -1 = unlimited
 }
 
