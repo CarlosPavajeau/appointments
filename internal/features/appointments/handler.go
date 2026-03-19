@@ -1,8 +1,10 @@
 package appointments
 
 import (
+	"errors"
 	"net/http"
 	"time"
+	apperrors "wappiz/internal/shared/errors"
 	"wappiz/internal/shared/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +24,7 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	g.Use(jwt.AuthMiddleware())
 	{
 		g.GET("", h.Search)
+		g.PUT("/:id/status", h.UpdateStatus)
 	}
 }
 
@@ -76,6 +79,44 @@ func (h *Handler) Search(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+type updateStatusRequest struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+}
+
+func (h *Handler) UpdateStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment ID"})
+		return
+	}
+
+	var req updateStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Status == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status is required"})
+		return
+	}
+
+	tenantID := jwt.TenantIDFromContext(c)
+	updatedBy := jwt.UserIDFromContext(c)
+
+	err = h.useCases.UpdateStatus(c.Request.Context(), id, tenantID, req.Status, updatedBy, req.Reason)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "appointment not found"})
+			return
+		}
+		if errors.Is(err, ErrInvalidTransition) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid status transition"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func parseListFilters(c *gin.Context) (ListFilters, bool) {

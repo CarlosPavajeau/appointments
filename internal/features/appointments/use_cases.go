@@ -75,3 +75,19 @@ func (uc *UseCases) GetByDate(ctx context.Context, tenantID uuid.UUID, date time
 func (uc *UseCases) Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error) {
 	return uc.repository.Search(ctx, tenantID, date, filters)
 }
+
+func (uc *UseCases) UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, newStatus, updatedBy, reason string) error {
+	appt, err := uc.repository.FindByID(ctx, id, tenantID)
+	if err != nil {
+		return err
+	}
+
+	allowed := validTransitions[appt.Status]
+	for _, s := range allowed {
+		if s == newStatus {
+			return uc.repository.UpdateStatus(ctx, id, newStatus, updatedBy, reason)
+		}
+	}
+
+	return ErrInvalidTransition
+}
