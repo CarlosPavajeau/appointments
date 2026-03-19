@@ -104,7 +104,7 @@ func (h *Handler) ActivateTenant(c *gin.Context) {
 // superAdminMiddleware restricts access to users with the superadmin role.
 func superAdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.GetString("role") != "superadmin" {
+		if c.GetString("role") != "admin" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
