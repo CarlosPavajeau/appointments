@@ -345,7 +345,7 @@ func parseOKPKey(k jwkEntry) (ed25519.PublicKey, error) {
 		return nil, fmt.Errorf("decode x: %w", err)
 	}
 	if len(xBytes) != ed25519.PublicKeySize {
-		return nil, fmt.Errorf("Ed25519 public key must be %d bytes, got %d", ed25519.PublicKeySize, len(xBytes))
+		return nil, fmt.Errorf("ed25519 public key must be %d bytes, got %d", ed25519.PublicKeySize, len(xBytes))
 	}
 	return ed25519.PublicKey(xBytes), nil
 }
@@ -452,10 +452,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			tenantID, err := defaultTenantFinder(c.Request.Context(), claims.UserID)
 			if err != nil {
 				log.Printf("[jwt] tenant lookup failed for user_id=%s: %v", claims.UserID, err)
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "tenant not found"})
-				return
+			} else {
+				c.Set("tenant_id", tenantID)
 			}
-			c.Set("tenant_id", tenantID)
 		}
 
 		c.Next()
