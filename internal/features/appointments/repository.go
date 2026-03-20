@@ -23,6 +23,7 @@ type Repository interface {
 
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string) error
 	UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string, h *AppointmentStatusHistory) error
+	FindStatusHistory(ctx context.Context, appointmentID, tenantID uuid.UUID) ([]AppointmentStatusHistory, error)
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
 }
 
@@ -196,6 +197,46 @@ func (r *pgAppointmentRepository) UpdateStatusWithHistory(ctx context.Context, i
 	}
 
 	return tx.Commit()
+}
+
+func (r *pgAppointmentRepository) FindStatusHistory(ctx context.Context, appointmentID, tenantID uuid.UUID) ([]AppointmentStatusHistory, error) {
+	var rows []struct {
+		ID            uuid.UUID `db:"id"`
+		AppointmentID uuid.UUID `db:"appointment_id"`
+		FromStatus    string    `db:"from_status"`
+		ToStatus      string    `db:"to_status"`
+		ChangedBy     string    `db:"changed_by"`
+		ChangedByRole string    `db:"changed_by_role"`
+		Reason        string    `db:"reason"`
+		CreatedAt     time.Time `db:"created_at"`
+	}
+
+	err := r.db.SelectContext(ctx, &rows, `
+        SELECT h.id, h.appointment_id, h.from_status, h.to_status,
+               h.changed_by, h.changed_by_role, h.reason, h.created_at
+        FROM appointment_status_history h
+        JOIN appointments a ON a.id = h.appointment_id
+        WHERE h.appointment_id = $1 AND a.tenant_id = $2
+        ORDER BY h.created_at ASC
+    `, appointmentID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]AppointmentStatusHistory, len(rows))
+	for i, row := range rows {
+		result[i] = AppointmentStatusHistory{
+			ID:            row.ID,
+			AppointmentID: row.AppointmentID,
+			FromStatus:    row.FromStatus,
+			ToStatus:      row.ToStatus,
+			ChangedBy:     row.ChangedBy,
+			ChangedByRole: row.ChangedByRole,
+			Reason:        row.Reason,
+			CreatedAt:     row.CreatedAt,
+		}
+	}
+	return result, nil
 }
 
 func (r *pgAppointmentRepository) MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error {

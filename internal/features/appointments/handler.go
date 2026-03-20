@@ -24,6 +24,7 @@ func (h *Handler) RegisterRoutes(r *gin.Engine) {
 	g.Use(jwt.AuthMiddleware())
 	{
 		g.GET("", h.Search)
+		g.GET("/:id/history", h.GetStatusHistory)
 		g.PUT("/:id/status", h.UpdateStatus)
 	}
 }
@@ -76,6 +77,50 @@ func (h *Handler) Search(c *gin.Context) {
 			EndsAt:         a.EndsAt,
 			Status:         a.Status,
 			PriceAtBooking: a.PriceAtBooking,
+		}
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+type statusHistoryResponse struct {
+	ID            uuid.UUID `json:"id"`
+	FromStatus    string    `json:"fromStatus"`
+	ToStatus      string    `json:"toStatus"`
+	ChangedBy     string    `json:"changedBy"`
+	ChangedByRole string    `json:"changedByRole"`
+	Reason        string    `json:"reason"`
+	CreatedAt     time.Time `json:"createdAt"`
+}
+
+func (h *Handler) GetStatusHistory(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment ID"})
+		return
+	}
+
+	tenantID := jwt.TenantIDFromContext(c)
+
+	history, err := h.useCases.GetStatusHistory(c.Request.Context(), id, tenantID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "appointment not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch history"})
+		return
+	}
+
+	result := make([]statusHistoryResponse, len(history))
+	for i, h := range history {
+		result[i] = statusHistoryResponse{
+			ID:            h.ID,
+			FromStatus:    h.FromStatus,
+			ToStatus:      h.ToStatus,
+			ChangedBy:     h.ChangedBy,
+			ChangedByRole: h.ChangedByRole,
+			Reason:        h.Reason,
+			CreatedAt:     h.CreatedAt,
 		}
 	}
 	c.JSON(http.StatusOK, result)
