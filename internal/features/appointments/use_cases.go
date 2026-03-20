@@ -76,7 +76,7 @@ func (uc *UseCases) Search(ctx context.Context, tenantID uuid.UUID, date time.Ti
 	return uc.repository.Search(ctx, tenantID, date, filters)
 }
 
-func (uc *UseCases) UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, newStatus, updatedBy, reason string) error {
+func (uc *UseCases) UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, newStatus, updatedBy, updatedByRole, reason string) error {
 	appt, err := uc.repository.FindByID(ctx, id, tenantID)
 	if err != nil {
 		return err
@@ -85,7 +85,15 @@ func (uc *UseCases) UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, ne
 	allowed := validTransitions[appt.Status]
 	for _, s := range allowed {
 		if s == newStatus {
-			return uc.repository.UpdateStatus(ctx, id, newStatus, updatedBy, reason)
+			return uc.repository.UpdateStatusWithHistory(ctx, id, newStatus, updatedBy, reason, &AppointmentStatusHistory{
+				ID:            uuid.New(),
+				AppointmentID: id,
+				FromStatus:    appt.Status,
+				ToStatus:      newStatus,
+				ChangedBy:     updatedBy,
+				ChangedByRole: updatedByRole,
+				Reason:        reason,
+			})
 		}
 	}
 

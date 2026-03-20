@@ -22,6 +22,7 @@ type Repository interface {
 	Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error)
 
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string) error
+	UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string, h *AppointmentStatusHistory) error
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
 }
 
@@ -167,6 +168,34 @@ func (r *pgAppointmentRepository) UpdateStatus(ctx context.Context, id uuid.UUID
         WHERE id = $4
     `, status, cancelledBy, reason, id)
 	return err
+}
+
+func (r *pgAppointmentRepository) UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status, cancelledBy, reason string, h *AppointmentStatusHistory) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx, `
+        UPDATE appointments
+        SET status = $1, cancelled_by = $2, cancel_reason = $3, updated_at = NOW()
+        WHERE id = $4
+    `, status, cancelledBy, reason, id)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(ctx, `
+        INSERT INTO appointment_status_history
+            (id, appointment_id, from_status, to_status, changed_by, changed_by_role, reason, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `, h.ID, h.AppointmentID, h.FromStatus, h.ToStatus, h.ChangedBy, h.ChangedByRole, h.Reason)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (r *pgAppointmentRepository) MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error {
