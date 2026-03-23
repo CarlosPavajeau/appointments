@@ -103,3 +103,10 @@ func (t *Tenant) BotName() string {
 	}
 	return t.Name
 }
+
+func (t *Tenant) CancellationMessage() string {
+	if t.Settings.CancellationMsg != "" {
+		return t.Settings.CancellationMsg
+	}
+	return "Escríbenos cuando quieras agendar una nueva cita 👋"
+}

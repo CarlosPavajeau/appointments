@@ -144,7 +144,7 @@ func (sm *StateMachine) handleEntry(ctx context.Context, msg IncomingMessage, cu
 		return fmt.Errorf("find tenant: %w", err)
 	}
 
-	body := fmt.Sprintf("👋 ¡Hola! Bienvenido a *%s*\n\n¿Qué deseas hacer?", tenant.Name)
+	body := "👋 " + tenant.WelcomeMessage() + "\n\n¿Qué deseas hacer?"
 	buttons := []whatsapp.Button{
 		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_schedule", Title: "📅 Agendar cita"}},
 		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_my_appointments", Title: "📋 Mis citas"}},
@@ -576,13 +576,19 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 
 	log.Printf("[scheduling] appointment cancelled | id=%s", appointmentID)
 
+	tenant, err := sm.tenantRepo.FindByID(ctx, msg.TenantID)
+	if err != nil {
+		log.Printf("[scheduling] ERROR finding tenant in handleCancelExecute | tenantID=%s err=%v", msg.TenantID, err)
+		return fmt.Errorf("find tenant: %w", err)
+	}
+	cancelMsg := tenant.CancellationMessage()
+
 	svc, err := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
 	if err != nil {
 		log.Printf("[scheduling] ERROR finding service after cancel | serviceID=%s err=%v",
 			appointment.ServiceID, err)
 		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
-			"✅ Tu cita ha sido cancelada.\n\n"+
-				"Escríbenos cuando quieras agendar una nueva cita 👋")
+			"✅ Tu cita ha sido cancelada.\n\n"+cancelMsg)
 	}
 
 	res, err := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
@@ -590,8 +596,7 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 		log.Printf("[scheduling] ERROR finding resource after cancel | resourceID=%s err=%v",
 			appointment.ResourceID, err)
 		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
-			"✅ Tu cita ha sido cancelada.\n\n"+
-				"Escríbenos cuando quieras agendar una nueva cita 👋")
+			"✅ Tu cita ha sido cancelada.\n\n"+cancelMsg)
 	}
 
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
@@ -599,9 +604,10 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 			"✅ Tu cita ha sido cancelada.\n\n"+
 				"✂️ %s con %s\n"+
 				"📅 %s\n\n"+
-				"Escríbenos cuando quieras agendar una nueva cita 👋",
+				"%s",
 			svc.Name, res.Name,
 			fmtTime(appointment.StartsAt, "02/01/2006 03:04 PM"),
+			cancelMsg,
 		),
 	)
 }
@@ -720,7 +726,7 @@ func (sm *StateMachine) sendAppointmentConfirmed(ctx context.Context, msg Incomi
 		name,
 		svc.Name, res.Name,
 		fmtTime(a.StartsAt, "02/01/2006 03:04 PM"),
-		tenant.Name,
+		tenant.BotName(),
 	)
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, body)
 }
