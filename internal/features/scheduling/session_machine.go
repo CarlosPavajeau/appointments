@@ -417,7 +417,7 @@ func (sm *StateMachine) handleMyAppointments(ctx context.Context, msg IncomingMe
 
 	text := fmt.Sprintf("¡Hola, %s! 👋 Aquí están tus próximas citas:\n", customer.DisplayName())
 	for i, a := range appts {
-		date := fmtTime(a.StartsAt, "Monday 02 Jan")
+		date := fmtTimeEs(a.StartsAt, "Monday 02 Jan")
 		timeStr := fmtTime(a.StartsAt, "03:04 PM")
 
 		text += fmt.Sprintf("\n*%d.* 📌 *%s*\n", i+1, a.ServiceName)
@@ -781,4 +781,51 @@ var bogotaLoc = func() *time.Location {
 
 func fmtTime(t time.Time, layout string) string {
 	return t.In(bogotaLoc).Format(layout)
+}
+
+var esWeekdays = map[string]string{
+	"Monday":    "Lunes",
+	"Tuesday":   "Martes",
+	"Wednesday": "Miércoles",
+	"Thursday":  "Jueves",
+	"Friday":    "Viernes",
+	"Saturday":  "Sábado",
+	"Sunday":    "Domingo",
+}
+
+var esMonths = map[string]string{
+	"January":   "Enero",
+	"February":  "Febrero",
+	"March":     "Marzo",
+	"April":     "Abril",
+	"May":       "Mayo",
+	"June":      "Junio",
+	"July":      "Julio",
+	"August":    "Agosto",
+	"September": "Septiembre",
+	"October":   "Octubre",
+	"November":  "Noviembre",
+	"December":  "Diciembre",
+	"Jan":       "Ene",
+	"Feb":       "Feb",
+	"Mar":       "Mar",
+	"Apr":       "Abr",
+	"Jun":       "Jun",
+	"Jul":       "Jul",
+	"Aug":       "Ago",
+	"Sep":       "Sep",
+	"Oct":       "Oct",
+	"Nov":       "Nov",
+	"Dec":       "Dic",
+}
+
+func fmtTimeEs(t time.Time, layout string) string {
+	s := fmtTime(t, layout)
+	for en, es := range esWeekdays {
+		s = strings.ReplaceAll(s, en, es)
+	}
+	for en, es := range esMonths {
+		s = strings.ReplaceAll(s, en, es)
+	}
+	return s
 }
