@@ -576,19 +576,12 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 
 	log.Printf("[scheduling] appointment cancelled | id=%s", appointmentID)
 
-	tenant, err := sm.tenantRepo.FindByID(ctx, msg.TenantID)
-	if err != nil {
-		log.Printf("[scheduling] ERROR finding tenant in handleCancelExecute | tenantID=%s err=%v", msg.TenantID, err)
-		return fmt.Errorf("find tenant: %w", err)
-	}
-	cancelMsg := tenant.CancellationMessage()
-
 	svc, err := sm.useCases.services.FindByID(ctx, appointment.ServiceID)
 	if err != nil {
 		log.Printf("[scheduling] ERROR finding service after cancel | serviceID=%s err=%v",
 			appointment.ServiceID, err)
 		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
-			"✅ Tu cita ha sido cancelada.\n\n"+cancelMsg)
+			"✅ Tu cita ha sido cancelada.")
 	}
 
 	res, err := sm.useCases.resources.FindByID(ctx, appointment.ResourceID)
@@ -596,18 +589,16 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 		log.Printf("[scheduling] ERROR finding resource after cancel | resourceID=%s err=%v",
 			appointment.ResourceID, err)
 		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
-			"✅ Tu cita ha sido cancelada.\n\n"+cancelMsg)
+			"✅ Tu cita ha sido cancelada.")
 	}
 
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 		fmt.Sprintf(
 			"✅ Tu cita ha sido cancelada.\n\n"+
 				"✂️ %s con %s\n"+
-				"📅 %s\n\n"+
-				"%s",
+				"📅 %s",
 			svc.Name, res.Name,
 			fmtTime(appointment.StartsAt, "02/01/2006 03:04 PM"),
-			cancelMsg,
 		),
 	)
 }
