@@ -566,8 +566,8 @@ func (sm *StateMachine) handleCancelExecute(ctx context.Context, msg IncomingMes
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
-	if err := sm.useCases.appointmentSvc.Cancel(
-		ctx, appointmentID, "customer", "Cancelado por el cliente",
+	if err := sm.useCases.appointmentSvc.UpdateStatus(
+		ctx, appointmentID, msg.TenantID, "cancelled", customer.ID.String(), "customer", "Cancelado por el cliente",
 	); err != nil {
 		log.Printf("[scheduling] ERROR cancelling appointment | id=%s err=%v", appointmentID, err)
 		return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,

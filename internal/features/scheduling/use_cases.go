@@ -23,6 +23,7 @@ type AppointmentService interface {
 	GetByCustomerWithDetails(ctx context.Context, tenantID, customerID uuid.UUID) ([]appointments.AppointmentWithDetails, error)
 	GetByID(ctx context.Context, id, tenantID uuid.UUID) (*appointments.Appointment, error)
 	Cancel(ctx context.Context, id uuid.UUID, cancelledBy, reason string) error
+	UpdateStatus(ctx context.Context, id, tenantID uuid.UUID, newStatus, updatedBy, updatedByRole, reason string) error
 	GetUpcomingForReminders(ctx context.Context) ([]appointments.Appointment, error)
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
 }
