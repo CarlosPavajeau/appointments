@@ -2,6 +2,7 @@ package appointments
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 	apperrors "wappiz/internal/shared/errors"
@@ -103,6 +104,8 @@ func (h *Handler) GetStatusHistory(c *gin.Context) {
 
 	history, err := h.useCases.GetStatusHistory(c.Request.Context(), id, tenantID)
 	if err != nil {
+		log.Printf("[appointments] error getting status history error=%s", err)
+
 		if errors.Is(err, apperrors.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "appointment not found"})
 			return
