@@ -415,7 +415,7 @@ func (sm *StateMachine) handleMyAppointments(ctx context.Context, msg IncomingMe
 			"No tienes citas próximas agendadas 📭\n¿Deseas agendar una?", buttons)
 	}
 
-	text := fmt.Sprintf("¡Hola, %s! 👋 Aquí están tus próximas citas:\n", customer.Name)
+	text := fmt.Sprintf("¡Hola, %s! 👋 Aquí están tus próximas citas:\n", *customer.Name)
 	for i, a := range appts {
 		date := fmtTime(a.StartsAt, "Monday 02 Jan")
 		timeStr := fmtTime(a.StartsAt, "03:04 PM")
