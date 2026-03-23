@@ -402,12 +402,12 @@ func (sm *StateMachine) handleConfirm(ctx context.Context, msg IncomingMessage, 
 }
 
 func (sm *StateMachine) handleMyAppointments(ctx context.Context, msg IncomingMessage, customer *customers.Customer) error {
-	appointments, err := sm.useCases.appointmentSvc.GetByCustomer(ctx, msg.TenantID, customer.ID)
+	appts, err := sm.useCases.appointmentSvc.GetByCustomerWithDetails(ctx, msg.TenantID, customer.ID)
 	if err != nil {
 		return err
 	}
 
-	if len(appointments) == 0 {
+	if len(appts) == 0 {
 		buttons := []whatsapp.Button{
 			{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_schedule", Title: "📅 Agendar cita"}},
 		}
@@ -415,14 +415,38 @@ func (sm *StateMachine) handleMyAppointments(ctx context.Context, msg IncomingMe
 			"No tienes citas próximas agendadas 📭\n¿Deseas agendar una?", buttons)
 	}
 
-	text := "Tus próximas citas 📋\n\n"
-	for _, a := range appointments {
-		text += fmt.Sprintf("• %s – %s\n",
-			fmtTime(a.StartsAt, "02/01 03:04 PM"),
-			a.Status)
+	text := fmt.Sprintf("¡Hola, %s! 👋 Aquí están tus próximas citas:\n", customer.Name)
+	for i, a := range appts {
+		date := fmtTime(a.StartsAt, "Monday 02 Jan")
+		timeStr := fmtTime(a.StartsAt, "03:04 PM")
+
+		text += fmt.Sprintf("\n*%d.* 📌 *%s*\n", i+1, a.ServiceName)
+		text += fmt.Sprintf("   🗓️ %s a las %s\n", date, timeStr)
+		text += fmt.Sprintf("   👤 Con: %s\n", a.ResourceName)
+		text += fmt.Sprintf("   📊 Estado: %s\n", appointmentStatusLabel(a.Status))
 	}
-	text += "\nPara cancelar una cita escribe *cancelar*."
+
+	text += "\n💬 Para cancelar una cita, toca el botón *Cancelar cita* en el menú principal."
 	return sm.wa.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, text)
+}
+
+func appointmentStatusLabel(status string) string {
+	switch status {
+	case "scheduled":
+		return "Agendada ✅"
+	case "confirmed":
+		return "Confirmada ✅"
+	case "checked_in":
+		return "En proceso 🔄"
+	case "completed":
+		return "Completada 🎉"
+	case "cancelled":
+		return "Cancelada ❌"
+	case "no_show":
+		return "No asistió ⚠️"
+	default:
+		return status
+	}
 }
 
 func (sm *StateMachine) handleCancelFlow(ctx context.Context, msg IncomingMessage, customer *customers.Customer) error {

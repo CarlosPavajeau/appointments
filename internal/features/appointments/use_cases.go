@@ -52,6 +52,10 @@ func (uc *UseCases) GetByCustomer(ctx context.Context, tenantID, customerID uuid
 	return uc.repository.FindByCustomerID(ctx, tenantID, customerID)
 }
 
+func (uc *UseCases) GetByCustomerWithDetails(ctx context.Context, tenantID, customerID uuid.UUID) ([]AppointmentWithDetails, error) {
+	return uc.repository.FindByCustomerIDWithDetails(ctx, tenantID, customerID)
+}
+
 func (uc *UseCases) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*Appointment, error) {
 	return uc.repository.FindByID(ctx, id, tenantID)
 }

@@ -17,6 +17,7 @@ type Repository interface {
 
 	FindByID(ctx context.Context, id, tenantID uuid.UUID) (*Appointment, error)
 	FindByCustomerID(ctx context.Context, tenantID, customerID uuid.UUID) ([]Appointment, error)
+	FindByCustomerIDWithDetails(ctx context.Context, tenantID, customerID uuid.UUID) ([]AppointmentWithDetails, error)
 	FindUpcomingForReminders(ctx context.Context) ([]Appointment, error)
 	FindByDate(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]Appointment, error)
 	Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error)
@@ -120,6 +121,50 @@ func (r *pgAppointmentRepository) FindByCustomerID(ctx context.Context, tenantID
 			ServiceID: row.ServiceID, CustomerID: row.CustomerID,
 			StartsAt: row.StartsAt, EndsAt: row.EndsAt,
 			Status: row.Status, PriceAtBooking: row.PriceAtBooking,
+		}
+	}
+	return result, nil
+}
+
+func (r *pgAppointmentRepository) FindByCustomerIDWithDetails(ctx context.Context, tenantID, customerID uuid.UUID) ([]AppointmentWithDetails, error) {
+	var rows []struct {
+		ID             uuid.UUID `db:"id"`
+		StartsAt       time.Time `db:"starts_at"`
+		EndsAt         time.Time `db:"ends_at"`
+		Status         string    `db:"status"`
+		PriceAtBooking float64   `db:"price_at_booking"`
+		ResourceName   string    `db:"resource_name"`
+		ServiceName    string    `db:"service_name"`
+	}
+
+	err := r.db.SelectContext(ctx, &rows, `
+        SELECT a.id, a.starts_at, a.ends_at, a.status, a.price_at_booking,
+               r.name AS resource_name,
+               s.name AS service_name
+        FROM appointments a
+        JOIN resources r ON r.id = a.resource_id
+        JOIN services  s ON s.id = a.service_id
+        WHERE a.tenant_id = $1 AND a.customer_id = $2
+          AND a.status = 'confirmed'
+          AND a.starts_at > NOW()
+        ORDER BY a.starts_at ASC
+        LIMIT 5
+    `, tenantID, customerID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]AppointmentWithDetails, len(rows))
+	for i, row := range rows {
+		result[i] = AppointmentWithDetails{
+			ID:             row.ID,
+			StartsAt:       row.StartsAt,
+			EndsAt:         row.EndsAt,
+			Status:         row.Status,
+			PriceAtBooking: row.PriceAtBooking,
+			ResourceName:   row.ResourceName,
+			ServiceName:    row.ServiceName,
 		}
 	}
 	return result, nil

@@ -20,6 +20,7 @@ import (
 type AppointmentService interface {
 	Create(ctx context.Context, input *appointments.CreateAppointmentInput) (*appointments.Appointment, error)
 	GetByCustomer(ctx context.Context, tenantID, customerID uuid.UUID) ([]appointments.Appointment, error)
+	GetByCustomerWithDetails(ctx context.Context, tenantID, customerID uuid.UUID) ([]appointments.AppointmentWithDetails, error)
 	GetByID(ctx context.Context, id, tenantID uuid.UUID) (*appointments.Appointment, error)
 	Cancel(ctx context.Context, id uuid.UUID, cancelledBy, reason string) error
 	GetUpcomingForReminders(ctx context.Context) ([]appointments.Appointment, error)
