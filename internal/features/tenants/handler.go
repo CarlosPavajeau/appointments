@@ -82,9 +82,14 @@ func (h *Handler) CreateTenant(c *gin.Context) {
 }
 
 type updateSettingsRequest struct {
-	WelcomeMessage  string `json:"welcomeMessage"`
-	BotName         string `json:"botName"`
-	CancellationMsg string `json:"cancellationMessage"`
+	WelcomeMessage           string `json:"welcomeMessage"`
+	BotName                  string `json:"botName"`
+	CancellationMsg          string `json:"cancellationMessage"`
+	ContactEmail             string `json:"contactEmail"`
+	LateCancelHours          int    `json:"lateCancelHours"`
+	AutoBlockAfterNoShows    int    `json:"autoBlockAfterNoShows"`
+	AutoBlockAfterLateCancel int    `json:"autoBlockAfterLateCancel"`
+	SendWarningBeforeBlock   bool   `json:"sendWarningBeforeBlock"`
 }
 
 type connectWhatsappRequest struct {
@@ -125,9 +130,14 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 
 	tenantID := jwt.TenantIDFromContext(c)
 	if err := h.useCases.UpdateSettings(c.Request.Context(), tenantID, TenantSettings{
-		WelcomeMessage:  req.WelcomeMessage,
-		BotName:         req.BotName,
-		CancellationMsg: req.CancellationMsg,
+		WelcomeMessage:           req.WelcomeMessage,
+		BotName:                  req.BotName,
+		CancellationMsg:          req.CancellationMsg,
+		ContactEmail:             req.ContactEmail,
+		LateCancelHours:          req.LateCancelHours,
+		AutoBlockAfterNoShows:    req.AutoBlockAfterNoShows,
+		AutoBlockAfterLateCancel: req.AutoBlockAfterLateCancel,
+		SendWarningBeforeBlock:   req.SendWarningBeforeBlock,
 	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
 		return
