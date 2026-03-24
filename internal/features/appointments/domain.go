@@ -19,16 +19,11 @@ type Appointment struct {
 	EndsAt         time.Time
 	Status         string
 	PriceAtBooking float64
+	CompletedAt    *time.Time
 
 	CancelledBy  *string
 	CancelReason *string
 	CancelledAt  *time.Time
-
-	NoShowReason *string
-	NoShowAt     *time.Time
-
-	CheckedInAt *time.Time
-	CompletedAt *time.Time
 }
 
 type AppointmentStatusHistory struct {
