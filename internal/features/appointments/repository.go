@@ -22,8 +22,7 @@ type Repository interface {
 	FindByDate(ctx context.Context, tenantID uuid.UUID, date time.Time) ([]Appointment, error)
 	Search(ctx context.Context, tenantID uuid.UUID, date time.Time, filters ListFilters) ([]AppointmentWithDetails, error)
 
-	UpdateStatus(ctx context.Context, id uuid.UUID, status string, cancelledBy *string, reason string) error
-	UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status string, cancelledBy *string, reason string, h *AppointmentStatusHistory) error
+	UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status string, changedBy *string, reason string, h *AppointmentStatusHistory) error
 	FindStatusHistory(ctx context.Context, appointmentID, tenantID uuid.UUID) ([]AppointmentStatusHistory, error)
 	MarkReminderSent(ctx context.Context, id uuid.UUID, reminderType string) error
 }
@@ -207,27 +206,30 @@ func (r *pgAppointmentRepository) FindUpcomingForReminders(ctx context.Context) 
 	return result, nil
 }
 
-func (r *pgAppointmentRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, cancelledBy *string, reason string) error {
-	_, err := r.db.ExecContext(ctx, `
-        UPDATE appointments
-        SET status = $1, cancelled_by = $2, cancel_reason = $3, updated_at = NOW()
-        WHERE id = $4
-    `, status, cancelledBy, reason, id)
-	return err
-}
-
-func (r *pgAppointmentRepository) UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status string, cancelledBy *string, reason string, h *AppointmentStatusHistory) error {
+func (r *pgAppointmentRepository) UpdateStatusWithHistory(ctx context.Context, id uuid.UUID, status string, changedBy *string, reason string, h *AppointmentStatusHistory) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, `
-        UPDATE appointments
-        SET status = $1, cancelled_by = $2, cancel_reason = $3, updated_at = NOW()
-        WHERE id = $4
-    `, status, cancelledBy, reason, id)
+	setClauses := []string{"status = $1", "updated_at = NOW()"}
+	args := []interface{}{status}
+	idx := 2
+
+	switch status {
+	case "cancelled":
+		setClauses = append(setClauses, fmt.Sprintf("cancelled_by = $%d", idx), fmt.Sprintf("cancel_reason = $%d", idx+1))
+		args = append(args, changedBy, reason)
+		idx += 2
+	case "completed":
+		setClauses = append(setClauses, "completed_at = NOW()")
+	}
+
+	args = append(args, id)
+	query := fmt.Sprintf("UPDATE appointments SET %s WHERE id = $%d", strings.Join(setClauses, ", "), idx)
+
+	_, err = tx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}

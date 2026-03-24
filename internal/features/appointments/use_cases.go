@@ -71,10 +71,6 @@ func (uc *UseCases) GetByID(ctx context.Context, id, tenantID uuid.UUID) (*Appoi
 	return uc.repository.FindByID(ctx, id, tenantID)
 }
 
-func (uc *UseCases) Cancel(ctx context.Context, id uuid.UUID, cancelledBy *string, reason string) error {
-	return uc.repository.UpdateStatus(ctx, id, "cancelled", cancelledBy, reason)
-}
-
 func (uc *UseCases) GetUpcomingForReminders(ctx context.Context) ([]Appointment, error) {
 	return uc.repository.FindUpcomingForReminders(ctx)
 }
