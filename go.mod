@@ -11,6 +11,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/resend/resend-go/v3 v3.1.1
+	github.com/sqlc-dev/pqtype v0.3.0
 	golang.org/x/crypto v0.45.0
 )
 
