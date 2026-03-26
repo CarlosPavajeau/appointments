@@ -24,6 +24,21 @@ type Querier interface {
 	//      verified_at          = NOW()
 	//  WHERE tenant_id = $5
 	ActivateTenantWhatsappConfig(ctx context.Context, db DBTX, arg ActivateTenantWhatsappConfigParams) error
+	//AdvanceOnboardingStep
+	//
+	//  UPDATE onboarding_progress
+	//  SET current_step = current_step + 1,
+	//      updated_at   = NOW()
+	//  WHERE tenant_id = $1
+	//    AND current_step < $2
+	AdvanceOnboardingStep(ctx context.Context, db DBTX, arg AdvanceOnboardingStepParams) error
+	//CompleteOnboardingProgress
+	//
+	//  UPDATE onboarding_progress
+	//  SET completed_at = NOW(),
+	//      updated_at   = NOW()
+	//  WHERE tenant_id = $1
+	CompleteOnboardingProgress(ctx context.Context, db DBTX, tenantID uuid.UUID) error
 	//DeleteResource
 	//
 	//  UPDATE resources
@@ -58,6 +73,13 @@ type Querier interface {
 	//  WHERE id = $1
 	//    AND resource_id = $2
 	DeleteWorkingHour(ctx context.Context, db DBTX, arg DeleteWorkingHourParams) error
+	//FindOnboardingProgressByTenant
+	//
+	//  SELECT id, tenant_id, current_step, completed_at, created_at, updated_at
+	//  FROM onboarding_progress
+	//  WHERE tenant_id = $1
+	//  LIMIT 1
+	FindOnboardingProgressByTenant(ctx context.Context, db DBTX, tenantID uuid.UUID) (OnboardingProgress, error)
 	//FindResourceById
 	//
 	//  SELECT id,
@@ -324,6 +346,11 @@ type Querier interface {
 	//    AND t.is_active = true
 	//  LIMIT 1
 	FindTenantWhatsappConfigByPhoneNumberID(ctx context.Context, db DBTX, phoneNumberID sql.NullString) (FindTenantWhatsappConfigByPhoneNumberIDRow, error)
+	//InsertOnboardingProgress
+	//
+	//  INSERT INTO onboarding_progress (id, tenant_id, current_step)
+	//  VALUES ($1, $2, $3)
+	InsertOnboardingProgress(ctx context.Context, db DBTX, arg InsertOnboardingProgressParams) error
 	//InsertResource
 	//
 	//  INSERT INTO resources(
