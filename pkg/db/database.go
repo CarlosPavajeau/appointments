@@ -2,8 +2,8 @@ package db
 
 import (
 	"database/sql"
-	"log"
 	"time"
+	"wappiz/pkg/logger"
 
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -21,11 +21,11 @@ func open(dns string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", dns)
 
 	if err != nil {
-		log.Fatalf("failed to open database connection: %v", err)
+		return nil, err
 	}
 
 	if err := db.Ping(); err != nil {
-		log.Fatalf("failed to ping database: %v", err)
+		return nil, err
 	}
 
 	db.SetMaxOpenConns(25)
@@ -33,7 +33,7 @@ func open(dns string) (*sql.DB, error) {
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(1 * time.Minute)
 
-	log.Println("database connection pool initialized successfully")
+	logger.Info("database connection pool initialized successfully")
 
 	return db, nil
 }
