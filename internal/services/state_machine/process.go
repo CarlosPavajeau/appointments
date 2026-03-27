@@ -26,8 +26,11 @@ const (
 )
 
 func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
-	logger.Info("[scheduling] processing message | tenant=%s from=%s body=%q interactiveID=%v",
-		msg.TenantID, msg.From, msg.Body, msg.InteractiveID)
+	logger.Info("[scheduling] processing message",
+		"tenant_id", msg.TenantID,
+		"from", msg.From,
+		"body", msg.Body,
+		"interactive_id", msg.InteractiveID)
 
 	customer, err := db.Query.FindCustomerByPhoneNumber(ctx, s.db.Primary(), db.FindCustomerByPhoneNumberParams{
 		TenantID:    msg.TenantID,
