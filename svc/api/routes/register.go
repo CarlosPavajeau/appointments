@@ -128,5 +128,5 @@ func RegisterRoute(g *gin.Engine, middlewares []gin.HandlerFunc, route Route) {
 	method := route.Method()
 	handleFn := route.Handle
 
-	g.Use(middlewares...).Handle(method, path, handleFn)
+	g.Group("/").Use(middlewares...).Handle(method, path, handleFn)
 }
