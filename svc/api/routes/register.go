@@ -114,7 +114,7 @@ func Register(g *gin.Engine, svc *Services) {
 	RegisterRoute(admin, &admin_activate_tenant.Handler{DB: svc.Database, Mailer: svc.Mailer})
 
 	// webhooks
-	RegisterRoute(auth, &webhooks_verify_webhook.Handler{})
+	RegisterRoute(g, &webhooks_verify_webhook.Handler{})
 
 	webhook := auth.Group("/", middleware.WhatsAppSignature(svc.AppSecret))
 	RegisterRoute(webhook, &webhooks_process_webhook.Handler{
