@@ -1,0 +1,49 @@
+package state_machine
+
+import (
+	"context"
+	"time"
+	"wappiz/internal/services/slot_finder"
+
+	"github.com/google/uuid"
+)
+
+type StateMachineService interface {
+	Process(ctx context.Context, msg IncomingMessage) error
+}
+
+type IncomingMessage struct {
+	TenantID         uuid.UUID
+	WhatsappConfigID uuid.UUID
+	PhoneNumberID    string
+	AccessToken      string
+	From             string
+	Body             string
+	InteractiveID    *string
+	ReceivedAt       time.Time
+}
+
+type SessionData struct {
+	ServiceID     *uuid.UUID `json:"service_id,omitempty"`
+	ResourceID    *uuid.UUID `json:"resource_id,omitempty"`
+	StartsAt      *time.Time `json:"starts_at,omitempty"`
+	DateAttempts  int        `json:"date_attempts"`
+	ConfirmedName *string    `json:"confirmed_name,omitempty"`
+}
+
+type DateValidationResult struct {
+	StartsAt  time.Time
+	Slots     []slot_finder.TimeSlot // empty if is available
+	SlotTaken bool
+}
+
+type SessionStep string
+
+const (
+	StepSelectService  SessionStep = "SELECT_SERVICE"
+	StepSelectResource SessionStep = "SELECT_RESOURCE"
+	StepSelectDate     SessionStep = "SELECT_DATE"
+	StepSelectTime     SessionStep = "SELECT_TIME"
+	StepAwaitingName   SessionStep = "AWAITING_NAME"
+	StepConfirm        SessionStep = "CONFIRM"
+)
