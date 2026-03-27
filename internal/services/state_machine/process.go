@@ -113,7 +113,7 @@ func (s *service) handleEntry(ctx context.Context, msg IncomingMessage, customer
 				WhatsappConfigID: msg.WhatsappConfigID,
 				CustomerID:       customer.ID,
 				Step:             string(StepSelectService),
-				Data:             make(json.RawMessage, 0),
+				Data:             json.RawMessage{},
 				ExpiresAt:        time.Now().Add(sessionTTL),
 			}); err != nil {
 				return fmt.Errorf("create session: %w", err)
@@ -641,7 +641,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			WhatsappConfigID: msg.WhatsappConfigID,
 			CustomerID:       customer.ID,
 			Step:             string(StepSelectService),
-			Data:             make(json.RawMessage, 0),
+			Data:             json.RawMessage{},
 			ExpiresAt:        time.Now().Add(sessionTTL),
 		}); err != nil {
 			return fmt.Errorf("create session: %w", err)
