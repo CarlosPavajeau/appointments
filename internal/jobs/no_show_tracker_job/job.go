@@ -33,7 +33,8 @@ func (j *job) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := j.process(ctx); err != nil {
-				logger.Error("[no_show_tracker] failed to process job %v", err)
+				logger.Error("[no_show_tracker] failed to process job",
+					"err", err)
 			}
 		}
 	}
@@ -42,7 +43,8 @@ func (j *job) Run(ctx context.Context) {
 func (j *job) process(ctx context.Context) error {
 	unattended, err := db.Query.FindUnattendedAppointments(ctx, j.db.Primary())
 	if err != nil {
-		logger.Warn("[no_show_tracker] failed to find unattended appointments: %v", err)
+		logger.Warn("[no_show_tracker] failed to find unattended appointments",
+			"err", err)
 		return err
 	}
 
@@ -55,7 +57,8 @@ func (j *job) process(ctx context.Context) error {
 			CompletedAt:  sql.NullTime{},
 			ID:           a.ID,
 		}); err != nil {
-			logger.Warn("[no_show_tracker] failed to update appointment: %v", err)
+			logger.Warn("[no_show_tracker] failed to update appointment",
+				"err", err)
 			continue
 		}
 
@@ -68,7 +71,8 @@ func (j *job) process(ctx context.Context) error {
 			ChangedByRole: sql.NullString{String: "system", Valid: true},
 			Reason:        sql.NullString{String: "Auto-detected: customer did not check in", Valid: true},
 		}); err != nil {
-			logger.Warn("[no_show_tracker] failed to insert appointment history: %v", err)
+			logger.Warn("[no_show_tracker] failed to insert appointment history",
+				"err", err)
 			continue
 		}
 
@@ -83,7 +87,8 @@ func (j *job) process(ctx context.Context) error {
 
 	recentlyCancelled, err := db.Query.FindRecentlyCancelledAppointments(ctx, j.db.Primary())
 	if err != nil {
-		logger.Warn("[no_show_tracker] failed to find recently cancelled appointments: %v", err)
+		logger.Warn("[no_show_tracker] failed to find recently cancelled appointments",
+			"err", err)
 		return err
 	}
 

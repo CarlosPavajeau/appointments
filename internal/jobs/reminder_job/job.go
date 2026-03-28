@@ -37,7 +37,8 @@ func (j *job) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := j.process(ctx); err != nil {
-				logger.Error("[reminder_job] failed to process job %v", err)
+				logger.Error("[reminder_job] failed to process job",
+					"err", err)
 			}
 		}
 	}
@@ -63,7 +64,8 @@ func (j *job) process(ctx context.Context) error {
 		}
 
 		if err := j.sendReminder(ctx, a, waConfig); err != nil {
-			logger.Warn("[reminder_job] failed to send reminder %v", err)
+			logger.Warn("[reminder_job] failed to send reminder",
+				"err", err)
 		}
 	}
 

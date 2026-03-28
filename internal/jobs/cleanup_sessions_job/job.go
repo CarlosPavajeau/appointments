@@ -30,7 +30,8 @@ func (j *job) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := db.Query.DeleteExpiredConversationSessions(ctx, j.db.Primary()); err != nil {
-				logger.Warn("[cleanup_sessions_job] failed to delete expired sessions: %v", err)
+				logger.Warn("[cleanup_sessions_job] failed to delete expired sessions",
+					"err", err)
 			}
 		}
 	}
