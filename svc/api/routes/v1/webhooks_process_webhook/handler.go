@@ -126,25 +126,33 @@ func (h *Handler) processPayload(req Request) {
 			})
 
 			if err != nil {
-				logger.Warn("webhook: unknown phone_number_id %s: %v", phoneNumberID, err)
+				logger.Warn("webhook: unknown phone_number_id",
+					"phone_number_id", phoneNumberID,
+					"err", err)
 				continue
 			}
 
 			for _, msg := range change.Value.Messages {
 				incoming, err := h.buildIncomingMessage(msg, change.Value.Metadata, waConfig)
 				if err != nil {
-					logger.Warn("webhook: failed to build message from %s: %v", msg.From, err)
+					logger.Warn("webhook: failed to build message",
+						"from", msg.From,
+						"err", err)
 					continue
 				}
 
 				if err := h.StateMachine.Process(ctx, *incoming); err != nil {
-					logger.Warn("webhook: error processing message from %s: %v", msg.From, err)
+					logger.Warn("webhook: error processing message from %s: %v",
+						"from", msg.From,
+						"err", err)
 				}
 			}
 
 			for _, status := range change.Value.Statuses {
-				logger.Info("webhook: message %s status=%s recipient=%s",
-					status.ID, status.Status, status.RecipientID)
+				logger.Info("webhook: received status update",
+					"id", status.ID,
+					"status", status.Status,
+					"recipient_id", status.RecipientID)
 			}
 		}
 	}
@@ -191,7 +199,9 @@ func (h *Handler) buildIncomingMessage(msg Message, metadata Metadata, waConfig 
 	default:
 		// Unsupported message types: audio, image, document, video, sticker, location, contacts, etc.
 		// We can log them for now, but we won't process them until we have a use case for it.
-		logger.Warn("webhook: unsupported message type %s from %s", msg.Type, msg.From)
+		logger.Warn("webhook: unsupported message",
+			"type", msg.Type,
+			"from", msg.From)
 	}
 
 	return incoming, nil
