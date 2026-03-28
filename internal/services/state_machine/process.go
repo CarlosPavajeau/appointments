@@ -1042,7 +1042,7 @@ func (s *service) sendConfirmation(ctx context.Context, msg IncomingMessage, ses
 	body := fmt.Sprintf(
 		"Resumen de tu cita 📋\n\n"+
 			"👤 Cliente:  %s\n"+
-			"✂️ Servicio: %s (%d min)\n"+
+			"📌 Servicio: %s (%d min)\n"+
 			"💈 Barbero:  %s\n"+
 			"📅 Fecha:    %s\n"+
 			"💰 Precio:   $%s\n\n"+
@@ -1091,7 +1091,7 @@ func (s *service) sendAppointmentConfirmed(ctx context.Context, msg IncomingMess
 
 	body := fmt.Sprintf(
 		"¡Listo, %s! 🎉 Tu cita está confirmada.\n\n"+
-			"✂️ %s con %s\n"+
+			"📌 %s con %s\n"+
 			"📅 %s\n"+
 			"Te enviaremos un recordatorio 24 horas antes.\n"+
 			"Si necesitas cancelar escríbenos aquí. ¡Hasta pronto! 👋",
