@@ -37,13 +37,18 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 		PhoneNumber: msg.From,
 	})
 	if err != nil {
-		logger.Info("[scheduling] customer not found, creating new one | tenant=%s phone=%s", msg.TenantID, msg.From)
+		logger.Info("[scheduling] customer not found, creating new one",
+			"tenant_id", msg.TenantID,
+			"phone_number", msg.From)
 
 		if err := db.Query.InsertCustomer(ctx, s.db.Primary(), db.InsertCustomerParams{
 			TenantID:    msg.TenantID,
 			PhoneNumber: msg.From,
 		}); err != nil {
-			logger.Error("[scheduling] failed to create customer | tenant=%s phone=%s error=%v", msg.TenantID, msg.From, err)
+			logger.Error("[scheduling] failed to create customer",
+				"tenant_id", msg.TenantID,
+				"phone_number", msg.From,
+				"err", err)
 			return err
 		}
 
@@ -53,13 +58,18 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 		})
 
 		if err != nil {
-			logger.Error("[scheduling] failed to retrieve newly created customer | tenant=%s phone=%s error=%v", msg.TenantID, msg.From, err)
+			logger.Error("[scheduling] failed to retrieve newly created customer",
+				"tenant_id", msg.TenantID,
+				"phone_number", msg.From,
+				"err", err)
 			return err
 		}
 	}
 
 	if customer.IsBlocked {
-		logger.Info("[scheduling] customer is blocked, ignoring message | tenant=%s phone=%s", msg.TenantID, msg.From)
+		logger.Info("[scheduling] customer is blocked, ignoring message",
+			"tenant_id", msg.TenantID,
+			"phone_number", msg.From)
 		return nil
 	}
 
@@ -92,10 +102,13 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 		return s.handleConfirm(ctx, msg, session, customer)
 
 	default:
-		logger.Warn("[scheduling] unknown step %q, resetting to entry | sessionID=%s", session.Step, session.ID)
+		logger.Warn("[scheduling] unknown step "+session.Step+" resetting to entry",
+			"session_id", session.ID)
 
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session with unknown step, resetting to entry | sessionID=%s error=%v", session.ID, err)
+			logger.Warn("[scheduling] failed to delete session with unknown step, resetting to entry",
+				"session_id", session.ID,
+				"err", err)
 
 		}
 
@@ -139,17 +152,21 @@ func (s *service) handleEntry(ctx context.Context, msg IncomingMessage, customer
 		case interactiveID == "action_keep":
 			return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, "👍 Perfecto, tu cita sigue agendada. ¿Hay algo más en lo que pueda ayudarte?")
 		default:
-			logger.Warn("[scheduling] unknown interactive ID on entry step, ignoring | tenantID=%s interactiveID=%s", msg.TenantID, interactiveID)
+			logger.Warn("[scheduling] unknown interactive ID on entry step, ignoring",
+				"tenant_id", msg.TenantID,
+				"interactive_id", interactiveID)
 		}
 	}
 
 	tenant, err := db.Query.FindTenantByID(ctx, s.db.Primary(), msg.TenantID)
 	if err != nil {
-		logger.Error("[scheduling] failed to find tenant for entry step | tenantID=%s error=%v", msg.TenantID, err)
+		logger.Error("[scheduling] failed to find tenant for entry step",
+			"tenant_id", msg.TenantID,
+			"err", err)
 		return fmt.Errorf("find tenant: %w", err)
 	}
 
-	body := "👋 Bienvenido a" + tenant.Name + "\n\n¿Qué deseas hacer?" // TODO: Use tenant's configured welcome message
+	body := "👋 Bienvenido a " + tenant.Name + "\n\n¿Qué deseas hacer?" // TODO: Use tenant's configured welcome message
 	buttons := []whatsapp.Button{
 		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_schedule", Title: "📅 Agendar cita"}},
 		{Type: "reply", Reply: whatsapp.ButtonReply{ID: "action_my_appointments", Title: "📋 Mis citas"}},
@@ -167,7 +184,9 @@ func (s *service) handleSelectService(ctx context.Context, msg IncomingMessage, 
 
 	var sessionData SessionData
 	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		logger.Error("[scheduling] failed to unmarshal session data on select service step | sessionID=%s error=%v", session.ID, err)
+		logger.Error("[scheduling] failed to unmarshal session data on select service step",
+			"session_id", session.ID,
+			"err", err)
 		return s.sendServiceList(ctx, msg)
 	}
 
@@ -229,7 +248,9 @@ func (s *service) handleSelectResource(ctx context.Context, msg IncomingMessage,
 
 	var sessionData SessionData
 	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		logger.Error("[scheduling] failed to marshal session data on select resource step | sessionID=%s error=%v", session.ID, err)
+		logger.Error("[scheduling] failed to marshal session data on select resource step",
+			"session_id", session.ID,
+			"err", err)
 		return s.sendServiceList(ctx, msg)
 	}
 
@@ -292,12 +313,15 @@ func (s *service) updateSession(ctx context.Context, session db.ConversationSess
 func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, session db.ConversationSession, customer db.Customer) error {
 	var sessionData SessionData
 	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		logger.Error("[scheduling] failed to marshal session data on select resource step | sessionID=%s error=%v", session.ID, err)
+		logger.Error("[scheduling] failed to marshal session data on select resource step",
+			"session_id", session.ID,
+			"err", err)
 		return fmt.Errorf("unmarshal session data: %w", err)
 	}
 
 	if sessionData.DateAttempts >= maxDateAttempts {
-		logger.Warn("[scheduling] max date attempts reached, resetting session | sessionID=%s", session.ID)
+		logger.Warn("[scheduling] max date attempts reached, resetting session",
+			"session_id", session.ID)
 
 		_ = db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID)
 
@@ -374,7 +398,9 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 	loc, _ := time.LoadLocation(timezone)
 	t, err := date_parser.ParseDateTime(input, loc)
 	if err != nil {
-		logger.Error("[scheduling] failed to parse date input | date=%s error=%v", input, err)
+		logger.Warn("[scheduling] failed to parse date input",
+			"input", input,
+			"err", err)
 		return nil, err
 	}
 
@@ -587,7 +613,8 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			PriceAtBooking: svc.Price,
 		}); err != nil {
 			if strings.Contains(err.Error(), "no_overlap") || strings.Contains(err.Error(), "exclusion constraint") {
-				logger.Warn("[scheduling] appointment overlap detected on confirm, informing customer | sessionID=%s", session.ID)
+				logger.Warn("[scheduling] appointment overlap detected on confirm, informing customer",
+					"session_id", session.ID)
 
 				suggestions, err := s.slotFinder.GetSuggestedSlots(ctx, slot_finder.GetSuggestedSlotsParams{
 					ResourceID: *sessionData.ResourceID,
@@ -626,14 +653,18 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 		}
 
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session after confirming appointment | sessionID=%s error=%v", session.ID, err)
+			logger.Warn("[scheduling] failed to delete session after confirming appointment",
+				"session_id", session.ID,
+				"err", err)
 		}
 
 		return s.sendAppointmentConfirmed(ctx, msg, appointmentID, session, customer)
 
 	case "confirm_modify":
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session after confirming modify | sessionID=%s error=%v", session.ID, err)
+			logger.Warn("[scheduling] failed to delete session after confirming modify",
+				"session_id", session.ID,
+				"err", err)
 			return fmt.Errorf("delete session after confirm_modify: %w", err)
 		}
 
@@ -654,7 +685,9 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 
 	case "confirm_cancel":
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session after confirming cancel | sessionID=%s error=%v", session.ID, err)
+			logger.Warn("[scheduling] failed to delete session after confirming cancel",
+				"session_id", session.ID,
+				"err", err)
 			return fmt.Errorf("delete session after confirming cancel: %w", err)
 		}
 
@@ -764,7 +797,9 @@ func (s *service) handleCancelFlow(ctx context.Context, msg IncomingMessage, cus
 func (s *service) handleCancelConfirm(ctx context.Context, msg IncomingMessage, customer db.Customer) error {
 	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "cancel_"))
 	if err != nil {
-		logger.Warn("[scheduling] failed to parse interactive id from cancel confirmation %q | err=%v", *msg.InteractiveID, err)
+		logger.Warn("[scheduling] failed to parse interactive id from cancel confirmation",
+			"interactive_id", *msg.InteractiveID,
+			"err", err)
 
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"Ocurrió un error. Por favor intenta de nuevo.")
@@ -776,27 +811,37 @@ func (s *service) handleCancelConfirm(ctx context.Context, msg IncomingMessage, 
 	})
 
 	if err != nil {
-		logger.Warn("[scheduling] failed to find appointment for cancel confirmation | appointmentID=%s err=%v", appointmentID, err)
+		logger.Warn("[scheduling] failed to find appointment for cancel confirmation",
+			"appointment_id", appointmentID,
+			"err", err)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
 	if appointment.CustomerID != customer.ID {
-		logger.Warn("[scheduling] appointment does not belong to customer for cancel confirmation | appointmentID=%s customerID=%s", appointmentID, customer.ID)
+		logger.Warn("[scheduling] appointment does not belong to customer for cancel confirmation",
+			"appointment_id", appointmentID,
+			"customer_id", customer.ID)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
 	svc, err := db.Query.FindServiceByID(ctx, s.db.Primary(), appointment.ServiceID)
 	if err != nil {
-		logger.Warn("[scheduling] failed to find service for cancel confirmation | serviceID=%s err=%v", appointment.ServiceID, err)
+		logger.Warn("[scheduling] failed to find service for cancel confirmation",
+			"appointment_id", appointmentID,
+			"service_id", appointment.ServiceID,
+			"err", err)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"Ocurrió un error. Por favor intenta de nuevo.")
 	}
 
 	rsc, err := db.Query.FindResourceById(ctx, s.db.Primary(), appointment.ResourceID)
 	if err != nil {
-		logger.Warn("[scheduling] failed to find resource for cancel confirmation | resourceID=%s err=%v", appointment.ResourceID, err)
+		logger.Warn("[scheduling] failed to find resource for cancel confirmation",
+			"appointment_id", appointmentID,
+			"resource_id", appointment.ResourceID,
+			"err", err)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"Ocurrió un error. Por favor intenta de nuevo.")
 	}
@@ -820,7 +865,9 @@ func (s *service) handleCancelConfirm(ctx context.Context, msg IncomingMessage, 
 func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, customer db.Customer) error {
 	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "cancel_"))
 	if err != nil {
-		logger.Warn("[scheduling] failed to parse interactive id from cancel confirmation %q | err=%v", *msg.InteractiveID, err)
+		logger.Warn("[scheduling] failed to parse interactive id from cancel confirmation",
+			"interactive_id", *msg.InteractiveID,
+			"err", err)
 
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"Ocurrió un error. Por favor intenta de nuevo.")
@@ -832,13 +879,17 @@ func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, 
 	})
 
 	if err != nil {
-		logger.Warn("[scheduling] failed to find appointment for cancel confirmation | appointmentID=%s err=%v", appointmentID, err)
+		logger.Warn("[scheduling] failed to find appointment for cancel confirmation",
+			"appointment_id", appointmentID,
+			"err", err)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
 	if appointment.CustomerID != customer.ID {
-		logger.Warn("[scheduling] appointment does not belong to customer for cancel confirmation | appointmentID=%s customerID=%s", appointmentID, customer.ID)
+		logger.Warn("[scheduling] appointment does not belong to customer for cancel confirmation",
+			"appointment_id", appointmentID,
+			"customer_id", customer.ID)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
@@ -850,7 +901,9 @@ func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, 
 		CompletedAt:  sql.NullTime{},
 		ID:           appointmentID,
 	}); err != nil {
-		logger.Warn("[scheduling] failed to update appointment status to cancelled | appointmentID=%s err=%v", appointmentID, err)
+		logger.Warn("[scheduling] failed to update appointment status to cancelled",
+			"appointment_id", appointmentID,
+			"err", err)
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
 			"Ocurrió un error al cancelar. Por favor intenta de nuevo.")
 	}
