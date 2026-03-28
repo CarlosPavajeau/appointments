@@ -111,7 +111,11 @@ func Register(g *gin.Engine, svc *Services) {
 	})
 
 	RegisterRoute(admin, &admin_find_pending_activations.Handler{DB: svc.Database})
-	RegisterRoute(admin, &admin_activate_tenant.Handler{DB: svc.Database, Mailer: svc.Mailer})
+	RegisterRoute(admin, &admin_activate_tenant.Handler{
+		DB:            svc.Database,
+		Mailer:        svc.Mailer,
+		EncryptionKey: svc.EncryptionKey,
+	})
 
 	// webhooks
 	RegisterRoute(g, &webhooks_verify_webhook.Handler{})

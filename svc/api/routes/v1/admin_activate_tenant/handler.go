@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"wappiz/pkg/crypto"
 	"wappiz/pkg/db"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/mailer"
@@ -20,8 +21,9 @@ type Request struct {
 }
 
 type Handler struct {
-	DB     db.Database
-	Mailer mailer.Mailer
+	DB            db.Database
+	Mailer        mailer.Mailer
+	EncryptionKey []byte
 }
 
 func (h *Handler) Method() string {
@@ -45,11 +47,16 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
+	accessToken, err := crypto.Encrypt(req.AccessToken, h.EncryptionKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
 	err = db.Query.ActivateTenantWhatsappConfig(c.Request.Context(), h.DB.Primary(), db.ActivateTenantWhatsappConfigParams{
 		WabaID:             sql.NullString{String: req.WABAID},
 		PhoneNumberID:      sql.NullString{String: req.PhoneNumberID},
 		DisplayPhoneNumber: sql.NullString{String: req.DisplayPhoneNumber},
-		AccessToken:        sql.NullString{String: req.AccessToken},
+		AccessToken:        sql.NullString{String: accessToken},
 		TenantID:           tenantID,
 	})
 
