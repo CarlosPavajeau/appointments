@@ -5,9 +5,13 @@ import (
 	"database/sql"
 )
 
+// Database defines the interface for database operations, providing access
+// to read and write replicas and the ability to close connections.
 type Database interface {
+	// Primary returns the primary database replica for read and write operations.
 	Primary() *Replica
 
+	// Close properly terminates all database connections
 	Close() error
 }
 
