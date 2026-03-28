@@ -13,8 +13,9 @@ import (
 )
 
 const findResourceOccupiedSlots = `-- name: FindResourceOccupiedSlots :many
-SELECT starts_at, ends_at
-FROM appointments
+SELECT a.starts_at, a.ends_at, r.name AS resource_name
+FROM appointments a
+         INNER JOIN resources r ON a.resource_id = r.id
 WHERE resource_id = $1
   AND starts_at >= $2
   AND ends_at <= $3
@@ -29,14 +30,16 @@ type FindResourceOccupiedSlotsParams struct {
 }
 
 type FindResourceOccupiedSlotsRow struct {
-	StartsAt time.Time `db:"starts_at"`
-	EndsAt   time.Time `db:"ends_at"`
+	StartsAt     time.Time `db:"starts_at"`
+	EndsAt       time.Time `db:"ends_at"`
+	ResourceName string    `db:"resource_name"`
 }
 
 // FindResourceOccupiedSlots
 //
-//	SELECT starts_at, ends_at
-//	FROM appointments
+//	SELECT a.starts_at, a.ends_at, r.name AS resource_name
+//	FROM appointments a
+//	         INNER JOIN resources r ON a.resource_id = r.id
 //	WHERE resource_id = $1
 //	  AND starts_at >= $2
 //	  AND ends_at <= $3
@@ -51,7 +54,7 @@ func (q *Queries) FindResourceOccupiedSlots(ctx context.Context, db DBTX, arg Fi
 	var items []FindResourceOccupiedSlotsRow
 	for rows.Next() {
 		var i FindResourceOccupiedSlotsRow
-		if err := rows.Scan(&i.StartsAt, &i.EndsAt); err != nil {
+		if err := rows.Scan(&i.StartsAt, &i.EndsAt, &i.ResourceName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

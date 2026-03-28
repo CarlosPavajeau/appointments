@@ -57,8 +57,12 @@ func (s *service) FindAvailableSlots(ctx context.Context, params FindAvailableSl
 
 	occupied := make([]TimeSlot, len(occupiedRows))
 	for i, r := range occupiedRows {
-		// TODO: Load resource name
-		occupied[i] = TimeSlot{StartsAt: r.StartsAt, EndsAt: r.EndsAt, ResourceID: params.ResourceID}
+		occupied[i] = TimeSlot{
+			StartsAt:     r.StartsAt,
+			EndsAt:       r.EndsAt,
+			ResourceID:   params.ResourceID,
+			ResourceName: r.ResourceName,
+		}
 	}
 
 	slotDuration := time.Duration(params.Service.DurationMinutes+params.Service.BufferMinutes) * time.Minute
