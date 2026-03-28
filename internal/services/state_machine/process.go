@@ -194,7 +194,8 @@ func (s *service) handleSelectService(ctx context.Context, msg IncomingMessage, 
 	session.Step = string(StepSelectResource)
 	session.ExpiresAt = time.Now().Add(sessionTTL)
 
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	session, err = s.updateSession(ctx, session, sessionData)
+	if err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
@@ -211,7 +212,8 @@ func (s *service) handleSelectService(ctx context.Context, msg IncomingMessage, 
 		sessionData.ResourceID = &rsc[0].ID
 		session.Step = string(StepSelectDate)
 
-		if err := s.updateSession(ctx, session, sessionData); err != nil {
+		session, err = s.updateSession(ctx, session, sessionData)
+		if err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
@@ -283,17 +285,17 @@ func (s *service) handleSelectResource(ctx context.Context, msg IncomingMessage,
 	sessionData.ResourceID = resourceID
 	session.Step = string(StepSelectDate)
 
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	if _, err := s.updateSession(ctx, session, sessionData); err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
 	return s.sendDatePrompt(ctx, msg)
 }
 
-func (s *service) updateSession(ctx context.Context, session db.ConversationSession, sessionData SessionData) error {
+func (s *service) updateSession(ctx context.Context, session db.ConversationSession, sessionData SessionData) (db.ConversationSession, error) {
 	updatedData, err := json.Marshal(sessionData)
 	if err != nil {
-		return fmt.Errorf("marshal session data: %w", err)
+		return session, fmt.Errorf("marshal session data: %w", err)
 	}
 
 	session.Data = updatedData
@@ -304,10 +306,10 @@ func (s *service) updateSession(ctx context.Context, session db.ConversationSess
 		ExpiresAt: session.ExpiresAt,
 		ID:        session.ID,
 	}); err != nil {
-		return fmt.Errorf("update session: %w", err)
+		return session, fmt.Errorf("update session: %w", err)
 	}
 
-	return nil
+	return session, nil
 }
 
 func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, session db.ConversationSession, customer db.Customer) error {
@@ -340,7 +342,7 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 
 	if err != nil {
 		sessionData.DateAttempts++
-		if err := s.updateSession(ctx, session, sessionData); err != nil {
+		if _, err := s.updateSession(ctx, session, sessionData); err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
@@ -357,7 +359,8 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 			sessionData.ConfirmedName = new(customer.Name.String)
 			session.Step = string(StepConfirm)
 
-			if err := s.updateSession(ctx, session, sessionData); err != nil {
+			session, err = s.updateSession(ctx, session, sessionData)
+			if err != nil {
 				return fmt.Errorf("update session: %w", err)
 			}
 
@@ -365,7 +368,7 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 		}
 
 		session.Step = string(StepAwaitingName)
-		if err := s.updateSession(ctx, session, sessionData); err != nil {
+		if _, err = s.updateSession(ctx, session, sessionData); err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
@@ -376,7 +379,7 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 	if len(result.Slots) == 0 {
 		sessionData.DateAttempts++
 
-		if err := s.updateSession(ctx, session, sessionData); err != nil {
+		if _, err = s.updateSession(ctx, session, sessionData); err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
@@ -387,7 +390,7 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 	session.Step = string(StepSelectTime)
 	sessionData.DateAttempts = 0
 
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	if _, err = s.updateSession(ctx, session, sessionData); err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
@@ -533,7 +536,8 @@ func (s *service) handleSelectTime(ctx context.Context, msg IncomingMessage, ses
 	sessionData.StartsAt = &startsAt
 	sessionData.ResourceID = &resourceID
 
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	session, err = s.updateSession(ctx, session, sessionData)
+	if err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
@@ -564,7 +568,9 @@ func (s *service) handleAwaitingName(ctx context.Context, msg IncomingMessage, s
 	sessionData.ConfirmedName = &name
 	session.Step = string(StepConfirm)
 
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	var err error
+	session, err = s.updateSession(ctx, session, sessionData)
+	if err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
@@ -631,7 +637,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 
 				session.Step = string(StepSelectTime)
 
-				if err := s.updateSession(ctx, session, sessionData); err != nil {
+				if _, err = s.updateSession(ctx, session, sessionData); err != nil {
 					return fmt.Errorf("update session: %w", err)
 				}
 
@@ -1000,6 +1006,10 @@ func (s *service) sendConfirmation(ctx context.Context, msg IncomingMessage, ses
 		return err
 	}
 
+	if sessionData.ServiceID == nil || sessionData.ResourceID == nil || sessionData.StartsAt == nil {
+		return fmt.Errorf("incomplete session data: missing service, resource, or start time")
+	}
+
 	svc, err := db.Query.FindServiceByID(ctx, s.db.Primary(), *sessionData.ServiceID)
 	if err != nil {
 		return err
@@ -1086,11 +1096,13 @@ func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessag
 		return err
 	}
 
+	var err error
 	if customer.Name.Valid {
 		sessionData.ConfirmedName = new(customer.Name.String)
 		session.Step = string(StepConfirm)
 
-		if err := s.updateSession(ctx, session, sessionData); err != nil {
+		session, err = s.updateSession(ctx, session, sessionData)
+		if err != nil {
 			return fmt.Errorf("update session: %w", err)
 		}
 
@@ -1098,7 +1110,7 @@ func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessag
 	}
 
 	session.Step = string(StepAwaitingName)
-	if err := s.updateSession(ctx, session, sessionData); err != nil {
+	if _, err = s.updateSession(ctx, session, sessionData); err != nil {
 		return fmt.Errorf("update session: %w", err)
 	}
 
