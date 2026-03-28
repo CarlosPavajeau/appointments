@@ -10,26 +10,25 @@ import (
 	"time"
 )
 
-type Client interface {
-	SendText(ctx context.Context, to, phoneNumberID, accessToken, body string) error
-	SendButtons(ctx context.Context, to, phoneNumberID, accessToken, body string, buttons []Button) error
-	SendList(ctx context.Context, to, phoneNumberID, accessToken, body string, sections []Section) error
-}
-
+// httpClient is the concrete implementation of [Client] backed by the
+// WhatsApp Business Cloud API over HTTP.
 type httpClient struct {
 	baseURL    string
 	apiVersion string
 	http       *http.Client
 }
 
-func New(baseURL, apiVersion string) Client {
+// New creates a [Client] initialised with the given [Config].
+// The underlying HTTP client is configured with a 10-second timeout.
+func New(cfg Config) *httpClient {
 	return &httpClient{
-		baseURL:    baseURL,
-		apiVersion: apiVersion,
+		baseURL:    cfg.BaseURL,
+		apiVersion: cfg.ApiVersion,
 		http:       &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
+// SendText sends a plain-text WhatsApp message to the recipient identified by to.
 func (c *httpClient) SendText(ctx context.Context, to, phoneNumberID, accessToken, body string) error {
 	req := SendMessageRequest{
 		MessagingProduct: "whatsapp",
@@ -41,6 +40,7 @@ func (c *httpClient) SendText(ctx context.Context, to, phoneNumberID, accessToke
 	return c.send(ctx, phoneNumberID, accessToken, req)
 }
 
+// SendButtons sends an interactive message with quick-reply buttons (max 3).
 func (c *httpClient) SendButtons(ctx context.Context, to, phoneNumberID, accessToken, body string, buttons []Button) error {
 	req := SendMessageRequest{
 		MessagingProduct: "whatsapp",
@@ -56,6 +56,8 @@ func (c *httpClient) SendButtons(ctx context.Context, to, phoneNumberID, accessT
 	return c.send(ctx, phoneNumberID, accessToken, req)
 }
 
+// SendList sends an interactive list message with selectable rows grouped into
+// sections. The list button label is fixed to "Ver opciones".
 func (c *httpClient) SendList(ctx context.Context, to, phoneNumberID, accessToken, body string, sections []Section) error {
 	req := SendMessageRequest{
 		MessagingProduct: "whatsapp",
@@ -74,6 +76,10 @@ func (c *httpClient) SendList(ctx context.Context, to, phoneNumberID, accessToke
 	return c.send(ctx, phoneNumberID, accessToken, req)
 }
 
+// send marshals payload to JSON and POSTs it to the Cloud API messages endpoint
+// for the given phoneNumberID, authenticated with accessToken.
+// Returns an error for any HTTP 4xx/5xx response, wrapping the response body
+// for context.
 func (c *httpClient) send(ctx context.Context, phoneNumberID, accessToken string, payload interface{}) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

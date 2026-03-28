@@ -1,20 +1,28 @@
 package whatsapp
 
+// WebhookPayload is the top-level structure of a WhatsApp Cloud API webhook
+// notification. It contains one or more entries, each holding a list of
+// changes that occurred on the associated WhatsApp Business Account.
 type WebhookPayload struct {
 	Object string  `json:"object"`
 	Entry  []Entry `json:"entry"`
 }
 
+// Entry represents a single WhatsApp Business Account within a webhook payload.
 type Entry struct {
 	ID      string   `json:"id"`
 	Changes []Change `json:"changes"`
 }
 
+// Change describes a single event that occurred, identified by Field
+// (e.g. "messages") and its associated Value.
 type Change struct {
 	Value ChangeValue `json:"value"`
 	Field string      `json:"field"`
 }
 
+// ChangeValue holds the content of a webhook change, including any inbound
+// messages and delivery status updates.
 type ChangeValue struct {
 	MessagingProduct string    `json:"messaging_product"`
 	Metadata         Metadata  `json:"metadata"`
@@ -27,6 +35,9 @@ type Metadata struct {
 	PhoneNumberID      string `json:"phone_number_id"`
 }
 
+// Message represents a single inbound message received from a WhatsApp user.
+// Text is set for plain-text messages; Interactive is set for button or list
+// replies.
 type Message struct {
 	ID          string       `json:"id"`
 	From        string       `json:"from"`
@@ -64,6 +75,8 @@ type Status struct {
 	RecipientID string `json:"recipient_id"`
 }
 
+// SendMessageRequest is the JSON body sent to the Cloud API messages endpoint.
+// Only one of Text or Interactive should be set, depending on Type.
 type SendMessageRequest struct {
 	MessagingProduct string          `json:"messaging_product"`
 	RecipientType    string          `json:"recipient_type"`
@@ -78,6 +91,8 @@ type OutText struct {
 	Body       string `json:"body"`
 }
 
+// OutInteractive is the interactive field of an outbound message.
+// Action must be either a [ButtonAction] or a [ListAction] depending on Type.
 type OutInteractive struct {
 	Type   string          `json:"type"`
 	Body   InteractiveBody `json:"body"`
