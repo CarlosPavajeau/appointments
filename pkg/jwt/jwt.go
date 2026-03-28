@@ -117,22 +117,31 @@ func (v *Verifier) doHTTPFetch() error {
 	next := make(map[string]any, len(set.Keys))
 	for _, k := range set.Keys {
 		if k.Kid == "" {
-			logger.Info("[jwt] skipping JWKS entry with empty kid (kty=%s alg=%s)", k.Kty, k.Alg)
+			logger.Info("[jwt] skipping JWKS entry with empty kid",
+				"kty", k.Kty,
+				"alg", k.Alg)
 			continue
 		}
 		if k.Use != "" && k.Use != "sig" {
-			logger.Info("[jwt] skipping JWKS key kid=%s use=%s (not a signing key)", k.Kid, k.Use)
+			logger.Info("[jwt] skipping JWKS key (not a signing key)",
+				"kid", k.Kid,
+				"use", k.Use)
 			continue // skip non-signing keys (e.g. encryption keys)
 		}
 		pub, err := parseJWK(k)
 		if err != nil {
-			logger.Info("[jwt] skipping malformed JWKS key kid=%s kty=%s: %v", k.Kid, k.Kty, err)
+			logger.Info("[jwt] skipping malformed JWKS key",
+				"kid", k.Kid,
+				"kty", k.Kty,
+				"err", err)
 			continue // skip malformed keys; don't fail the whole set
 		}
 		next[k.Kid] = pub
 	}
 
-	logger.Info("[jwt] JWKS refreshed: loaded %d signing key(s) from %s", len(next), v.jwksURL)
+	logger.Info("[jwt] JWKS refreshed",
+		"keys", len(next),
+		"url", v.jwksURL)
 
 	v.cacheMu.Lock()
 	v.cache = next
@@ -199,7 +208,9 @@ func (v *Verifier) lookupKey(kid string) (any, error) {
 			cachedKids = append(cachedKids, k)
 		}
 		v.cacheMu.RUnlock()
-		logger.Info("[jwt] signing key %q not found in JWKS after refresh; available kids: %v", kid, cachedKids)
+		logger.Info("[jwt] signing key not found in JWKS after refresh",
+			"kid", kid,
+			"kids", strings.Join(cachedKids, ","))
 		return nil, fmt.Errorf("signing key %q not found in JWKS", kid)
 	}
 	return key, nil
@@ -209,22 +220,28 @@ func (v *Verifier) lookupKey(kid string) (any, error) {
 func (v *Verifier) VerifyToken(tokenStr string) (*Claims, error) {
 	kid, alg, err := extractTokenHeader(tokenStr)
 	if err != nil {
-		logger.Info("[jwt] malformed token header: %v", err)
+		logger.Info("[jwt] malformed token header",
+			"err", err)
 		return nil, errors.New("malformed token")
 	}
 
-	logger.Info("[jwt] verifying token: kid=%q alg=%q", kid, alg)
+	logger.Info("[jwt] verifying token",
+		"kid", kid,
+		"alg", alg)
 
 	// Enforce algorithm allowlist before touching any key material.
 	// This prevents algorithm confusion attacks (e.g. RS256 → HS256, alg:none).
 	if !isAllowedAlg(alg) {
-		logger.Warn("[jwt] rejected: algorithm %q is not in the allowlist", alg)
+		logger.Warn("[jwt] rejected: algorithm not in allowlist",
+			"alg", alg)
 		return nil, fmt.Errorf("algorithm %q is not permitted", alg)
 	}
 
 	key, err := v.lookupKey(kid)
 	if err != nil {
-		logger.Warn("[jwt] key lookup failed for kid=%q: %v", kid, err)
+		logger.Warn("[jwt] key lookup failed",
+			"kid", kid,
+			"err", err)
 		return nil, err
 	}
 
@@ -233,7 +250,8 @@ func (v *Verifier) VerifyToken(tokenStr string) (*Claims, error) {
 	}
 	if v.issuer != "" {
 		opts = append(opts, gojwt.WithIssuer(v.issuer))
-		logger.Info("[jwt] issuer validation enabled: expected iss=%q", v.issuer)
+		logger.Info("[jwt] issuer validation enabled",
+			"iss", v.issuer)
 	}
 
 	token, err := gojwt.ParseWithClaims(tokenStr, &Claims{},
@@ -243,24 +261,32 @@ func (v *Verifier) VerifyToken(tokenStr string) (*Claims, error) {
 			case *gojwt.SigningMethodRSA, *gojwt.SigningMethodECDSA, *gojwt.SigningMethodEd25519:
 				return key, nil
 			default:
-				logger.Warn("[jwt] rejected: unexpected signing method %T", t.Method)
+				logger.Warn("[jwt] rejected: unexpected signing method",
+					"method", fmt.Sprintf("%T", t.Method))
 				return nil, errors.New("unexpected signing method")
 			}
 		},
 		opts...,
 	)
 	if err != nil {
-		logger.Warn("[jwt] ParseWithClaims failed for kid=%q alg=%q: %v", kid, alg, err)
+		logger.Warn("[jwt] ParseWithClaims failed",
+			"kid", kid,
+			"alg", alg,
+			"err", err)
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		logger.Warn("[jwt] token parsed but claims are invalid: ok=%v valid=%v", ok, token.Valid)
+		logger.Warn("[jwt] token parsed but claims are invalid",
+			"ok", ok,
+			"valid", token.Valid)
 		return nil, errors.New("invalid token")
 	}
 
-	logger.Info("[jwt] token valid: user_id=%s role=%s", claims.UserID, claims.Role)
+	logger.Info("[jwt] token valid",
+		"user_id", claims.UserID,
+		"role", claims.Role)
 	return claims, nil
 }
 
@@ -424,8 +450,10 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		header := c.GetHeader("Authorization")
 		if len(header) < 8 || header[:7] != "Bearer " {
-			logger.Info("[jwt] missing or malformed Authorization header on %s %s (len=%d)",
-				c.Request.Method, c.Request.URL.Path, len(header))
+			logger.Info("[jwt] missing or malformed Authorization header",
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"len", len(header))
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
@@ -433,14 +461,19 @@ func AuthMiddleware() gin.HandlerFunc {
 		claims, err := defaultVerifier.VerifyToken(header[7:])
 		if err != nil {
 			if errors.Is(err, gojwt.ErrTokenExpired) {
-				logger.Warn("[jwt] token expired on %s %s", c.Request.Method, c.Request.URL.Path)
+				logger.Warn("[jwt] token expired",
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path)
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 					"error": "token_expired",
 					"hint":  "obtain a new token from the authentication service",
 				})
 				return
 			}
-			logger.Warn("[jwt] invalid token on %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
+			logger.Warn("[jwt] invalid token",
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"err", err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
 			return
 		}
@@ -451,7 +484,9 @@ func AuthMiddleware() gin.HandlerFunc {
 		if defaultTenantFinder != nil {
 			tenantID, err := defaultTenantFinder(c.Request.Context(), claims.UserID)
 			if err != nil {
-				logger.Warn("[jwt] tenant lookup failed for user_id=%s: %v", claims.UserID, err)
+				logger.Warn("[jwt] tenant lookup failed",
+				"user_id", claims.UserID,
+				"err", err)
 			} else {
 				c.Set("tenant_id", tenantID)
 			}
