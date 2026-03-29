@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"os"
 	"wappiz/pkg/logger"
 
@@ -47,7 +46,8 @@ func LoadConfiguration() Config {
 func mustGet(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("environment variable %s is required", key)
+		logger.Error("missing environment variable: " + key)
+		os.Exit(1)
 	}
 	return v
 }
