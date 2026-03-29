@@ -1,4 +1,4 @@
-package tenants_update_tenant
+package tenants_update_tenant_settings
 
 import (
 	"encoding/json"
@@ -29,7 +29,7 @@ func (h *Handler) Method() string {
 }
 
 func (h *Handler) Path() string {
-	return "/v1/tenants"
+	return "/v1/tenants/settings"
 }
 
 func (h *Handler) Handle(c *gin.Context) {
