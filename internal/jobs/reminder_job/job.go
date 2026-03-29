@@ -50,7 +50,7 @@ func (j *job) process(ctx context.Context) error {
 		return err
 	}
 
-	var waConfigs map[uuid.UUID]db.FindTenantWhatsappConfigRow
+	waConfigs := make(map[uuid.UUID]db.FindTenantWhatsappConfigRow)
 	for _, a := range upcoming {
 		waConfig, ok := waConfigs[a.TenantID]
 
