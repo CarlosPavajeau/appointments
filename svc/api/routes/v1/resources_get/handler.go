@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var dayNames = [7]string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+var dayNames = [7]string{"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"}
 
 type WorkingHoursResponse struct {
 	ID        uuid.UUID `json:"id"`
