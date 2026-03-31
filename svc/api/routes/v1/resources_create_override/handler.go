@@ -26,18 +26,18 @@ type Handler struct {
 func (h *Handler) Method() string { return http.MethodPost }
 func (h *Handler) Path() string   { return "/v1/resources/:id/overrides" }
 
-func nullTime(s *string) sql.NullTime {
+func nullTime(s *string) sql.NullString {
 	if s == nil || *s == "" {
-		return sql.NullTime{}
+		return sql.NullString{}
 	}
 	t, err := time.Parse("15:04:05", *s)
 	if err != nil {
 		t, err = time.Parse("15:04", *s)
 		if err != nil {
-			return sql.NullTime{}
+			return sql.NullString{}
 		}
 	}
-	return sql.NullTime{Time: t, Valid: true}
+	return sql.NullString{String: t.Format("15:04:05"), Valid: true}
 }
 
 func (h *Handler) Handle(c *gin.Context) {
