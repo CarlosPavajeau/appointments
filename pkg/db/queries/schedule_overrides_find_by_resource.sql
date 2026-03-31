@@ -3,8 +3,8 @@ SELECT id,
        resource_id,
        date,
        is_day_off,
-       start_time::text,
-       end_time::text,
+       start_time,
+       end_time,
        COALESCE(reason, '') as reason,
        created_at
 FROM schedule_overrides

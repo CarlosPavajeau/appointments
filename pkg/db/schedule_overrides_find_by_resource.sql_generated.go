@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,8 +18,8 @@ SELECT id,
        resource_id,
        date,
        is_day_off,
-       start_time::text,
-       end_time::text,
+       start_time,
+       end_time,
        COALESCE(reason, '') as reason,
        created_at
 FROM schedule_overrides
@@ -34,14 +35,14 @@ type FindResourceScheduleOverridesParams struct {
 }
 
 type FindResourceScheduleOverridesRow struct {
-	ID         uuid.UUID `db:"id"`
-	ResourceID uuid.UUID `db:"resource_id"`
-	Date       time.Time `db:"date"`
-	IsDayOff   bool      `db:"is_day_off"`
-	StartTime  string    `db:"start_time"`
-	EndTime    string    `db:"end_time"`
-	Reason     string    `db:"reason"`
-	CreatedAt  time.Time `db:"created_at"`
+	ID         uuid.UUID    `db:"id"`
+	ResourceID uuid.UUID    `db:"resource_id"`
+	Date       time.Time    `db:"date"`
+	IsDayOff   bool         `db:"is_day_off"`
+	StartTime  sql.NullTime `db:"start_time"`
+	EndTime    sql.NullTime `db:"end_time"`
+	Reason     string       `db:"reason"`
+	CreatedAt  time.Time    `db:"created_at"`
 }
 
 // FindResourceScheduleOverrides
@@ -50,8 +51,8 @@ type FindResourceScheduleOverridesRow struct {
 //	       resource_id,
 //	       date,
 //	       is_day_off,
-//	       start_time::text,
-//	       end_time::text,
+//	       start_time,
+//	       end_time,
 //	       COALESCE(reason, '') as reason,
 //	       created_at
 //	FROM schedule_overrides

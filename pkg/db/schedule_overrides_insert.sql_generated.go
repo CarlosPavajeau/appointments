@@ -42,8 +42,8 @@ type InsertScheduleOverrideParams struct {
 	ResourceID uuid.UUID      `db:"resource_id"`
 	Date       time.Time      `db:"date"`
 	IsDayOff   bool           `db:"is_day_off"`
-	StartTime  string         `db:"start_time"`
-	EndTime    string         `db:"end_time"`
+	StartTime  sql.NullTime   `db:"start_time"`
+	EndTime    sql.NullTime   `db:"end_time"`
 	Reason     sql.NullString `db:"reason"`
 }
 

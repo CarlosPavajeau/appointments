@@ -15,8 +15,8 @@ type Response struct {
 	ID        uuid.UUID `json:"id"`
 	Date      string    `json:"date"`
 	IsDayOff  bool      `json:"isDayOff"`
-	StartTime *string   `json:"startTime"`
-	EndTime   *string   `json:"endTime"`
+	StartTime string    `json:"startTime"`
+	EndTime   string    `json:"endTime"`
 	Reason    string    `json:"reason"`
 }
 
@@ -74,12 +74,20 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	response := make([]Response, len(overrides))
 	for i, o := range overrides {
+		var startTime, endTime string
+		if o.StartTime.Valid {
+			startTime = o.StartTime.Time.String()
+		}
+		if o.EndTime.Valid {
+			endTime = o.EndTime.Time.String()
+		}
+
 		response[i] = Response{
 			ID:        o.ID,
 			Date:      o.Date.Format("2006-01-02"),
 			IsDayOff:  o.IsDayOff,
-			StartTime: &o.StartTime,
-			EndTime:   &o.EndTime,
+			StartTime: startTime,
+			EndTime:   endTime,
 			Reason:    o.Reason,
 		}
 	}
