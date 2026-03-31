@@ -120,9 +120,9 @@ func (s *service) GetSuggestedSlots(ctx context.Context, params GetSuggestedSlot
 func (s *service) resolveWorkingHours(ctx context.Context, resourceID uuid.UUID, date time.Time, override *db.FindResourceScheduleOverridesRow) (*time.Time, *time.Time, error) {
 	loc := date.Location()
 
-	if override != nil && !override.IsDayOff && override.StartTime != "" {
-		start := parseTimeOnDate(date, override.StartTime, loc)
-		end := parseTimeOnDate(date, override.EndTime, loc)
+	if override != nil && !override.IsDayOff && override.StartTime.Valid {
+		start := parseTimeOnDate(date, override.StartTime.Time.Format("15:04:05"), loc)
+		end := parseTimeOnDate(date, override.EndTime.Time.Format("15:04:05"), loc)
 		return &start, &end, nil
 	}
 
