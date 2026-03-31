@@ -5,6 +5,7 @@ import (
 	"time"
 	"wappiz/pkg/db"
 	"wappiz/pkg/jwt"
+	"wappiz/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -72,6 +73,8 @@ func (h *Handler) Handle(c *gin.Context) {
 		Date_2:     to,
 	})
 	if err != nil {
+		logger.Error("failed to find overrides",
+			"err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch overrides"})
 		return
 	}
