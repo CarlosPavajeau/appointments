@@ -120,7 +120,6 @@ func Run(ctx context.Context, cfg Config) error {
 
 	// Server with graceful shutdown
 	srv := &http.Server{
-		Addr:         cfg.Port,
 		Handler:      g,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
