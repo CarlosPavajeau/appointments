@@ -12,7 +12,8 @@ func main() {
 	err := api.Run(context.Background(), cfg)
 
 	if err != nil {
-		logger.Error("failed to run API: %v", err)
+		logger.Error("failed to run API",
+			"err", err)
 		os.Exit(1)
 	}
 }
