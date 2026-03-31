@@ -26,6 +26,20 @@
           },
           "overrides": [
             {
+              "column": "schedule_overrides.start_time",
+              "go_type": {
+                "type": "string"
+              },
+              "nullable": true
+            },
+            {
+              "column": "schedule_overrides.end_time",
+              "go_type": {
+                "type": "string"
+              },
+              "nullable": true
+            },
+            {
               "db_type": "json",
               "go_type": {
                 "type": "[]byte"

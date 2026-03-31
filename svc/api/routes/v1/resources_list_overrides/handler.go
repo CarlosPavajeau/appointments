@@ -27,13 +27,6 @@ type Handler struct {
 func (h *Handler) Method() string { return http.MethodGet }
 func (h *Handler) Path() string   { return "/v1/resources/:id/overrides" }
 
-func nullableString(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -85,8 +78,8 @@ func (h *Handler) Handle(c *gin.Context) {
 			ID:        o.ID,
 			Date:      o.Date.Format("2006-01-02"),
 			IsDayOff:  o.IsDayOff,
-			StartTime: nullableString(o.StartTime),
-			EndTime:   nullableString(o.EndTime),
+			StartTime: &o.StartTime,
+			EndTime:   &o.EndTime,
 			Reason:    o.Reason,
 		}
 	}
