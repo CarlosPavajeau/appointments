@@ -78,6 +78,7 @@ func Run(ctx context.Context, cfg Config) error {
 	g := gin.New()
 
 	g.Use(gin.Recovery())
+	g.Use(requestIDMiddleware())
 	g.Use(logMiddleware())
 
 	routes.Register(g, &routes.Services{
@@ -148,6 +149,18 @@ func Run(ctx context.Context, cfg Config) error {
 	return nil
 }
 
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		c.Next()
+	}
+}
+
 func logMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -168,14 +181,17 @@ func logMiddleware() gin.HandlerFunc {
 			}
 		}
 
+		requestID, _ := c.Get("request_id")
+
 		event.Set(slog.Group("http",
-			"method", c.Request.Method,
-			"path", path,
-			"host", c.Request.Host,
-			"user_agent", c.Request.UserAgent(),
-			"status", c.Writer.Status(),
-			"latency_ms", time.Since(start).Milliseconds(),
-			"client_ip", c.ClientIP(),
+			slog.String("request_id", requestID.(string)),
+			slog.String("method", c.Request.Method),
+			slog.String("path", path),
+			slog.String("host", c.Request.Host),
+			slog.String("user_agent", c.Request.UserAgent()),
+			slog.String("ip_address", c.ClientIP()),
+			slog.Int("status_code", c.Writer.Status()),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
 		))
 
 	}
