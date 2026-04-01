@@ -160,7 +160,7 @@ func logMiddleware() gin.HandlerFunc {
 			"path", path,
 			"query", query,
 			"status", c.Writer.Status(),
-			"latency", time.Since(start).String(),
+			"latency(ms)", time.Since(start).Milliseconds(),
 			"client_ip", c.ClientIP(),
 		)
 
