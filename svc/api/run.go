@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 	"wappiz/internal/jobs/cleanup_sessions_job"
@@ -151,23 +152,31 @@ func logMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
 
-		c.Next()
-
-		logger.Info("request",
-			"method", c.Request.Method,
-			"path", path,
-			"query", query,
-			"status", c.Writer.Status(),
-			"latency(ms)", time.Since(start).Milliseconds(),
-			"client_ip", c.ClientIP(),
+		ctx, event := logger.StartWideEvent(c,
+			fmt.Sprintf("%s %s", c.Request.Method, path),
 		)
+
+		defer event.End()
+
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
 
 		if len(c.Errors) > 0 {
 			for _, err := range c.Errors {
-				logger.Error("request error", "error", err.Error())
+				event.SetError(err)
 			}
 		}
+
+		event.Set(slog.Group("http",
+			"method", c.Request.Method,
+			"path", path,
+			"host", c.Request.Host,
+			"user_agent", c.Request.UserAgent(),
+			"status", c.Writer.Status(),
+			"latency(ms)", time.Since(start).Milliseconds(),
+			"client_ip", c.ClientIP(),
+		))
+
 	}
 }
