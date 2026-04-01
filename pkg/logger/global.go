@@ -17,6 +17,7 @@ var (
 func init() {
 	mu = sync.Mutex{}
 	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 	sampler = AlwaysSample{}
 }
 
