@@ -462,8 +462,8 @@ func AuthMiddleware() gin.HandlerFunc {
 		if err != nil {
 			if errors.Is(err, gojwt.ErrTokenExpired) {
 				logger.Warn("[jwt] token expired",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path)
+					"method", c.Request.Method,
+					"path", c.Request.URL.Path)
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 					"error": "token_expired",
 					"hint":  "obtain a new token from the authentication service",
@@ -485,8 +485,8 @@ func AuthMiddleware() gin.HandlerFunc {
 			tenantID, err := defaultTenantFinder(c.Request.Context(), claims.UserID)
 			if err != nil {
 				logger.Warn("[jwt] tenant lookup failed",
-				"user_id", claims.UserID,
-				"err", err)
+					"user_id", claims.UserID,
+					"err", err)
 			} else {
 				c.Set("tenant_id", tenantID)
 			}

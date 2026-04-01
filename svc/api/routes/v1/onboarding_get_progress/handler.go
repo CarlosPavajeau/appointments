@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"wappiz/pkg/db"
 	"wappiz/pkg/jwt"
+	"wappiz/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,9 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	progress, err := db.Query.FindOnboardingProgressByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
+		logger.Error("failed to find onboarding progress by tenant",
+			"tenant_id", tenantID,
+			"err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch progress"})
 		return
 	}
