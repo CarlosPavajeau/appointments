@@ -31,6 +31,13 @@ import (
 	"wappiz/svc/api/routes/v1/resources_update"
 	"wappiz/svc/api/routes/v1/resources_update_sort_order"
 	"wappiz/svc/api/routes/v1/resources_upsert_working_hours"
+	"wappiz/svc/api/routes/v1/services_create"
+	"wappiz/svc/api/routes/v1/services_list"
+	"wappiz/svc/api/routes/v1/services_update"
+	"wappiz/svc/api/routes/v1/tenants_create"
+	"wappiz/svc/api/routes/v1/tenants_get_by_user"
+	"wappiz/svc/api/routes/v1/tenants_get_current"
+	"wappiz/svc/api/routes/v1/tenants_update"
 	"wappiz/svc/api/routes/v1/webhooks_process_webhook"
 	"wappiz/svc/api/routes/v1/webhooks_verify_webhook"
 
