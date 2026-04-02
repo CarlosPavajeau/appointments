@@ -134,17 +134,6 @@ CREATE TABLE conversation_sessions
     CONSTRAINT conversation_sessions_tenant_id_client_id_key UNIQUE (tenant_id, customer_id)
 );
 
-CREATE TABLE conversations
-(
-    id           bigserial PRIMARY KEY,
-    created_at   timestamp with time zone,
-    updated_at   timestamp with time zone,
-    deleted_at   timestamp with time zone,
-    phone        text NOT NULL,
-    current_step text default 'NEW'::text,
-    temp_data    jsonb
-);
-
 CREATE TABLE customers
 (
     id           uuid                     default gen_random_uuid() NOT NULL
@@ -268,8 +257,3 @@ CREATE INDEX idx_appointments_status_date
     ON appointments (tenant_id, status, starts_at);
 CREATE INDEX idx_status_history_appointment ON appointment_status_history (appointment_id);
 CREATE INDEX idx_sessions_lookup ON conversation_sessions (tenant_id, customer_id);
-create UNIQUE index idx_conversations_phone
-    on conversations (phone);
-
-create index idx_conversations_deleted_at
-    on conversations (deleted_at);
