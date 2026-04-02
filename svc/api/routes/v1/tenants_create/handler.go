@@ -1,4 +1,4 @@
-package tenants_create_tenant
+package tenants_create
 
 import (
 	"fmt"

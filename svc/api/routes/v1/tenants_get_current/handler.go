@@ -1,4 +1,4 @@
-package tenants_find_current
+package tenants_get_current
 
 import (
 	"encoding/json"

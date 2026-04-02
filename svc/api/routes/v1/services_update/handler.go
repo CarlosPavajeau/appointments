@@ -1,4 +1,4 @@
-package services_create_service
+package services_update
 
 import (
 	"database/sql"
@@ -24,14 +24,20 @@ type Handler struct {
 }
 
 func (h *Handler) Method() string {
-	return http.MethodPost
+	return http.MethodPut
 }
 
 func (h *Handler) Path() string {
-	return "/v1/services"
+	return "/v1/services/:id"
 }
 
 func (h *Handler) Handle(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service id"})
+		return
+	}
+
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -40,18 +46,19 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	tenantID := jwt.TenantIDFromContext(c)
 
-	if err := db.Query.InsertService(c.Request.Context(), h.DB.Primary(), db.InsertServiceParams{
-		ID:              uuid.New(),
-		TenantID:        tenantID,
+	if err := db.Query.UpdateService(c.Request.Context(), h.DB.Primary(), db.UpdateServiceParams{
 		Name:            req.Name,
 		Description:     sql.NullString{String: req.Description},
 		DurationMinutes: req.DurationMinutes,
 		BufferMinutes:   req.BufferMinutes,
 		Price:           fmt.Sprint(req.Price),
 		SortOrder:       1,
+		ID:              id,
+		TenantID:        tenantID,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
 	}
 
-	c.Status(http.StatusCreated)
+	c.Status(http.StatusNoContent)
 }

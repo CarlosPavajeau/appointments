@@ -1,4 +1,4 @@
-package tenants_update_tenant_settings
+package tenants_update
 
 import (
 	"encoding/json"

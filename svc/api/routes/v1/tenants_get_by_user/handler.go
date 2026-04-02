@@ -1,4 +1,4 @@
-package tenants_find_by_user
+package tenants_get_by_user
 
 import (
 	"encoding/json"

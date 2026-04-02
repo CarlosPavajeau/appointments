@@ -31,13 +31,6 @@ import (
 	"wappiz/svc/api/routes/v1/resources_update"
 	"wappiz/svc/api/routes/v1/resources_update_sort_order"
 	"wappiz/svc/api/routes/v1/resources_upsert_working_hours"
-	"wappiz/svc/api/routes/v1/services_create_service"
-	"wappiz/svc/api/routes/v1/services_list_services"
-	"wappiz/svc/api/routes/v1/services_update_service"
-	"wappiz/svc/api/routes/v1/tenants_create_tenant"
-	"wappiz/svc/api/routes/v1/tenants_find_by_user"
-	"wappiz/svc/api/routes/v1/tenants_find_current"
-	"wappiz/svc/api/routes/v1/tenants_update_tenant_settings"
 	"wappiz/svc/api/routes/v1/webhooks_process_webhook"
 	"wappiz/svc/api/routes/v1/webhooks_verify_webhook"
 
@@ -73,15 +66,15 @@ func Register(g *gin.Engine, svc *Services) {
 
 	// ---------------------------------------------------------------------------
 	// v1/tenants
-	RegisterRoute(auth, &tenants_create_tenant.Handler{DB: svc.Database})
-	RegisterRoute(auth, &tenants_find_current.Handler{DB: svc.Database})
-	RegisterRoute(auth, &tenants_find_by_user.Handler{DB: svc.Database})
-	RegisterRoute(auth, &tenants_update_tenant_settings.Handler{DB: svc.Database})
+	RegisterRoute(auth, &tenants_create.Handler{DB: svc.Database})
+	RegisterRoute(auth, &tenants_get_current.Handler{DB: svc.Database})
+	RegisterRoute(auth, &tenants_get_by_user.Handler{DB: svc.Database})
+	RegisterRoute(auth, &tenants_update.Handler{DB: svc.Database})
 
 	// v1/services
-	RegisterRoute(auth, &services_create_service.Handler{DB: svc.Database})
-	RegisterRoute(auth, &services_list_services.Handler{DB: svc.Database})
-	RegisterRoute(auth, &services_update_service.Handler{DB: svc.Database})
+	RegisterRoute(auth, &services_create.Handler{DB: svc.Database})
+	RegisterRoute(auth, &services_list.Handler{DB: svc.Database})
+	RegisterRoute(auth, &services_update.Handler{DB: svc.Database})
 
 	// v1/appointments
 	RegisterRoute(auth, &appointments_search.Handler{DB: svc.Database})

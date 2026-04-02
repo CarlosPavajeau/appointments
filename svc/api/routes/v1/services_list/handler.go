@@ -1,4 +1,4 @@
-package services_list_services
+package services_list
 
 import (
 	"net/http"
