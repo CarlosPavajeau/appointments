@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"wappiz/pkg/date_formatter"
 	"wappiz/pkg/db"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/whatsapp"
@@ -97,7 +98,7 @@ func (j *job) sendReminder(ctx context.Context, appointment db.FindUpcomingAppoi
 			"📅 %s\n"+
 			"Si necesitas cancelar escríbenos aquí.",
 		timeLabel,
-		appointment.StartsAt.Format("02/01/2006 03:04 PM"),
+		date_formatter.FormatTime(appointment.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
 	)
 
 	if err := j.whatsapp.SendText(ctx, customer.PhoneNumber,
