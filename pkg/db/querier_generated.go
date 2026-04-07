@@ -39,6 +39,41 @@ type Querier interface {
 	//  WHERE id = $1
 	//    AND tenant_id = $2
 	BlockCustomer(ctx context.Context, db DBTX, arg BlockCustomerParams) error
+	//ClaimDueAppointmentReminderEvents
+	//
+	//  INSERT INTO appointment_reminder_events(
+	//      id,
+	//      appointment_id,
+	//      tenant_id,
+	//      customer_id,
+	//      reminder_type,
+	//      attempts,
+	//      created_at
+	//  )
+	//  SELECT gen_random_uuid(),
+	//         a.id,
+	//         a.tenant_id,
+	//         a.customer_id,
+	//         CASE
+	//             WHEN a.reminder_24h_sent_at IS NULL
+	//                 AND a.starts_at BETWEEN NOW() + INTERVAL '23 hours' AND NOW() + INTERVAL '25 hours'
+	//                 THEN '24h'
+	//             WHEN a.reminder_1h_sent_at IS NULL
+	//                 AND a.starts_at BETWEEN NOW() + INTERVAL '50 minutes' AND NOW() + INTERVAL '70 minutes'
+	//                 THEN '1h'
+	//             ELSE NULL
+	//             END AS reminder_type,
+	//         0,
+	//         NOW()
+	//  FROM appointments a
+	//  WHERE a.status = 'confirmed'
+	//    AND (
+	//      (a.reminder_24h_sent_at IS NULL AND a.starts_at BETWEEN NOW() + INTERVAL '23 hours' AND NOW() + INTERVAL '25 hours')
+	//          OR
+	//      (a.reminder_1h_sent_at IS NULL AND a.starts_at BETWEEN NOW() + INTERVAL '50 minutes' AND NOW() + INTERVAL '70 minutes')
+	//      )
+	//  ON CONFLICT (appointment_id, reminder_type) DO NOTHING
+	ClaimDueAppointmentReminderEvents(ctx context.Context, db DBTX) error
 	//CompleteOnboardingProgress
 	//
 	//  UPDATE onboarding_progress
@@ -219,6 +254,23 @@ type Querier interface {
 	//  WHERE tenant_id = $1
 	//  LIMIT 1
 	FindOnboardingProgressByTenant(ctx context.Context, db DBTX, tenantID uuid.UUID) (OnboardingProgress, error)
+	//FindPendingAppointmentReminderEvents
+	//
+	//  SELECT e.id,
+	//         e.appointment_id,
+	//         e.tenant_id,
+	//         e.customer_id,
+	//         e.reminder_type,
+	//         e.attempts,
+	//         a.starts_at
+	//  FROM appointment_reminder_events e
+	//           JOIN appointments a ON a.id = e.appointment_id
+	//  WHERE e.sent_at IS NULL
+	//    AND e.attempts < 5
+	//    AND a.status = 'confirmed'
+	//  ORDER BY e.created_at
+	//  LIMIT 500
+	FindPendingAppointmentReminderEvents(ctx context.Context, db DBTX) ([]FindPendingAppointmentReminderEventsRow, error)
 	//FindRecentlyCancelledAppointments
 	//
 	//  SELECT id,
@@ -822,6 +874,41 @@ type Querier interface {
 	//      reminder_1h_sent_at  = COALESCE(reminder_1h_sent_at, $2)
 	//  WHERE id = $3
 	Mark24hAppointmentReminderSent(ctx context.Context, db DBTX, arg Mark24hAppointmentReminderSentParams) error
+	//MarkAppointmentReminderEventFailed
+	//
+	//  UPDATE appointment_reminder_events
+	//  SET last_attempt_at = NOW(),
+	//      attempts = attempts + 1,
+	//      last_error = $2
+	//  WHERE id = $1
+	//    AND sent_at IS NULL
+	MarkAppointmentReminderEventFailed(ctx context.Context, db DBTX, arg MarkAppointmentReminderEventFailedParams) error
+	//MarkAppointmentReminderEventSent
+	//
+	//  UPDATE appointment_reminder_events
+	//  SET sent_at = NOW(),
+	//      last_attempt_at = NOW(),
+	//      attempts = attempts + 1,
+	//      last_error = NULL
+	//  WHERE id = $1
+	//    AND sent_at IS NULL
+	MarkAppointmentReminderEventSent(ctx context.Context, db DBTX, id uuid.UUID) error
+	//MarkAppointmentReminderSentByType
+	//
+	//  UPDATE appointments
+	//  SET reminder_24h_sent_at = CASE
+	//                                 WHEN $1::text = '24h'
+	//                                     THEN COALESCE(reminder_24h_sent_at, NOW())
+	//                                 ELSE reminder_24h_sent_at
+	//      END,
+	//      reminder_1h_sent_at  = CASE
+	//                                 WHEN $1::text = '1h'
+	//                                     THEN COALESCE(reminder_1h_sent_at, NOW())
+	//                                 ELSE reminder_1h_sent_at
+	//          END
+	//  WHERE id = $2::uuid
+	//    AND status = 'confirmed'
+	MarkAppointmentReminderSentByType(ctx context.Context, db DBTX, arg MarkAppointmentReminderSentByTypeParams) error
 	//MarkUnattendedAppointmentsNoShow
 	//
 	//  UPDATE appointments

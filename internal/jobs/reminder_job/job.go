@@ -46,26 +46,61 @@ func (j *job) Run(ctx context.Context) {
 }
 
 func (j *job) process(ctx context.Context) error {
-	upcoming, err := db.Query.FindUpcomingAppointments(ctx, j.db.Primary())
+	tx, err := j.db.Primary().Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := db.Query.ClaimDueAppointmentReminderEvents(ctx, tx); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	pending, err := db.Query.FindPendingAppointmentReminderEvents(ctx, j.db.Primary())
 	if err != nil {
 		return err
 	}
 
 	waConfigs := make(map[uuid.UUID]db.FindTenantWhatsappConfigRow)
-	for _, a := range upcoming {
-		waConfig, ok := waConfigs[a.TenantID]
+	customers := make(map[uuid.UUID]db.FindCustomerByIDRow)
+
+	for _, reminder := range pending {
+		waConfig, ok := waConfigs[reminder.TenantID]
 
 		if !ok {
-			waConfig, err = db.Query.FindTenantWhatsappConfig(ctx, j.db.Primary(), a.TenantID)
+			waConfig, err = db.Query.FindTenantWhatsappConfig(ctx, j.db.Primary(), reminder.TenantID)
 			if err != nil {
+				j.markReminderFailed(ctx, reminder.ID, err)
 				continue
 			}
 
-			waConfigs[a.TenantID] = waConfig
+			waConfigs[reminder.TenantID] = waConfig
 		}
 
-		if err := j.sendReminder(ctx, a, waConfig); err != nil {
+		customer, ok := customers[reminder.CustomerID]
+		if !ok {
+			customer, err = db.Query.FindCustomerByID(ctx, j.db.Primary(), reminder.CustomerID)
+			if err != nil {
+				j.markReminderFailed(ctx, reminder.ID, err)
+				continue
+			}
+			customers[reminder.CustomerID] = customer
+		}
+
+		if err := j.sendReminder(ctx, reminder, customer, waConfig); err != nil {
+			j.markReminderFailed(ctx, reminder.ID, err)
 			logger.Warn("[reminder_job] failed to send reminder",
+				"err", err)
+			continue
+		}
+
+		if err := j.markReminderSent(ctx, reminder); err != nil {
+			logger.Warn("[reminder_job] failed to mark reminder as sent",
+				"event_id", reminder.ID,
 				"err", err)
 		}
 	}
@@ -73,23 +108,28 @@ func (j *job) process(ctx context.Context) error {
 	return nil
 }
 
-func (j *job) sendReminder(ctx context.Context, appointment db.FindUpcomingAppointmentsRow, waConfig db.FindTenantWhatsappConfigRow) error {
+func (j *job) sendReminder(
+	ctx context.Context,
+	reminder db.FindPendingAppointmentReminderEventsRow,
+	customer db.FindCustomerByIDRow,
+	waConfig db.FindTenantWhatsappConfigRow,
+) error {
 	if !waConfig.PhoneNumberID.Valid || !waConfig.AccessToken.Valid {
 		return nil
 	}
 
-	customer, err := db.Query.FindCustomerByID(ctx, j.db.Primary(), appointment.CustomerID)
-	if err != nil {
-		return err
+	timeLabel := "en 1 hora"
+	if reminder.ReminderType == "24h" {
+		timeLabel = "mañana"
 	}
 
-	timeUntil := time.Until(appointment.StartsAt)
-	reminderType := "24h"
-	timeLabel := "mañana"
-
-	if timeUntil < 2*time.Hour {
-		reminderType = "1h"
-		timeLabel = "en 1 hora"
+	// Fallback guard for any legacy rows.
+	if reminder.ReminderType != "24h" && reminder.ReminderType != "1h" {
+		timeUntil := time.Until(reminder.StartsAt)
+		timeLabel = "mañana"
+		if timeUntil < 2*time.Hour {
+			timeLabel = "en 1 hora"
+		}
 	}
 
 	body := fmt.Sprintf(
@@ -98,7 +138,7 @@ func (j *job) sendReminder(ctx context.Context, appointment db.FindUpcomingAppoi
 			"📅 %s\n"+
 			"Si necesitas cancelar escríbenos aquí.",
 		timeLabel,
-		date_formatter.FormatTime(appointment.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
+		date_formatter.FormatTime(reminder.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
 	)
 
 	if err := j.whatsapp.SendText(ctx, customer.PhoneNumber,
@@ -107,26 +147,42 @@ func (j *job) sendReminder(ctx context.Context, appointment db.FindUpcomingAppoi
 		return err
 	}
 
-	var reminder24hSentAt sql.NullTime
-	var reminder1hSentAt sql.NullTime
+	return nil
+}
 
-	if reminderType == "24h" {
-		reminder24hSentAt = sql.NullTime{
-			Time:  time.Now(),
-			Valid: true,
-		}
+func (j *job) markReminderSent(ctx context.Context, reminder db.FindPendingAppointmentReminderEventsRow) error {
+	tx, err := j.db.Primary().Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := db.Query.MarkAppointmentReminderSentByType(ctx, tx, db.MarkAppointmentReminderSentByTypeParams{
+		ReminderType:  reminder.ReminderType,
+		AppointmentID: reminder.AppointmentID,
+	}); err != nil {
+		return err
 	}
 
-	if reminderType == "1h" {
-		reminder1hSentAt = sql.NullTime{
-			Time:  time.Now(),
-			Valid: true,
-		}
+	if err := db.Query.MarkAppointmentReminderEventSent(ctx, tx, reminder.ID); err != nil {
+		return err
 	}
 
-	return db.Query.Mark24hAppointmentReminderSent(ctx, j.db.Primary(), db.Mark24hAppointmentReminderSentParams{
-		Reminder24hSentAt: reminder24hSentAt,
-		Reminder1hSentAt:  reminder1hSentAt,
-		ID:                appointment.ID,
-	})
+	return tx.Commit()
+}
+
+func (j *job) markReminderFailed(ctx context.Context, eventID uuid.UUID, reminderErr error) {
+	errMsg := reminderErr.Error()
+	if len(errMsg) > 1000 {
+		errMsg = errMsg[:1000]
+	}
+
+	if err := db.Query.MarkAppointmentReminderEventFailed(ctx, j.db.Primary(), db.MarkAppointmentReminderEventFailedParams{
+		ID:        eventID,
+		LastError: sql.NullString{String: errMsg, Valid: true},
+	}); err != nil {
+		logger.Warn("[reminder_job] failed to mark reminder event as failed",
+			"event_id", eventID,
+			"err", err)
+	}
 }

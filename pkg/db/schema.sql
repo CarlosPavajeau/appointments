@@ -138,6 +138,28 @@ CREATE TABLE appointment_penalty_events
     CONSTRAINT appointment_penalty_events_unique UNIQUE (appointment_id, event_type)
 );
 
+CREATE TABLE appointment_reminder_events
+(
+    id              uuid                     default gen_random_uuid() NOT NULL
+        PRIMARY KEY,
+    appointment_id  uuid                                               NOT NULL
+        REFERENCES appointments
+            ON DELETE CASCADE,
+    tenant_id       uuid                                               NOT NULL
+        REFERENCES tenants
+            ON DELETE CASCADE,
+    customer_id     uuid                                               NOT NULL
+        REFERENCES customers
+            ON DELETE CASCADE,
+    reminder_type   varchar(10)                                        NOT NULL,
+    attempts        integer                  default 0                 NOT NULL,
+    sent_at         timestamp with time zone,
+    last_attempt_at timestamp with time zone,
+    last_error      text,
+    created_at      timestamp with time zone default now()             NOT NULL,
+    CONSTRAINT appointment_reminder_events_unique UNIQUE (appointment_id, reminder_type)
+);
+
 CREATE TABLE conversation_sessions
 (
     id                 uuid                     DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -286,5 +308,8 @@ CREATE INDEX idx_appointments_unattended
 CREATE INDEX idx_status_history_appointment ON appointment_status_history (appointment_id);
 CREATE INDEX idx_appointment_penalty_events_customer
     ON appointment_penalty_events (tenant_id, customer_id, occurred_at DESC);
+CREATE INDEX idx_appointment_reminder_events_pending
+    ON appointment_reminder_events (sent_at, attempts, created_at)
+    WHERE sent_at IS NULL;
 CREATE INDEX idx_sessions_active_lookup
     ON conversation_sessions (tenant_id, customer_id, expires_at);

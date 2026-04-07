@@ -136,6 +136,19 @@ type AppointmentPenaltyEvent struct {
 	CreatedAt     time.Time `db:"created_at"`
 }
 
+type AppointmentReminderEvent struct {
+	ID            uuid.UUID      `db:"id"`
+	AppointmentID uuid.UUID      `db:"appointment_id"`
+	TenantID      uuid.UUID      `db:"tenant_id"`
+	CustomerID    uuid.UUID      `db:"customer_id"`
+	ReminderType  string         `db:"reminder_type"`
+	Attempts      int32          `db:"attempts"`
+	SentAt        sql.NullTime   `db:"sent_at"`
+	LastAttemptAt sql.NullTime   `db:"last_attempt_at"`
+	LastError     sql.NullString `db:"last_error"`
+	CreatedAt     time.Time      `db:"created_at"`
+}
+
 type AppointmentStatusHistory struct {
 	ID            uuid.UUID         `db:"id"`
 	AppointmentID uuid.UUID         `db:"appointment_id"`

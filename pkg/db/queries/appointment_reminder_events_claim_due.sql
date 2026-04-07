@@ -1,0 +1,33 @@
+-- name: ClaimDueAppointmentReminderEvents :exec
+INSERT INTO appointment_reminder_events(
+    id,
+    appointment_id,
+    tenant_id,
+    customer_id,
+    reminder_type,
+    attempts,
+    created_at
+)
+SELECT gen_random_uuid(),
+       a.id,
+       a.tenant_id,
+       a.customer_id,
+       CASE
+           WHEN a.reminder_24h_sent_at IS NULL
+               AND a.starts_at BETWEEN NOW() + INTERVAL '23 hours' AND NOW() + INTERVAL '25 hours'
+               THEN '24h'
+           WHEN a.reminder_1h_sent_at IS NULL
+               AND a.starts_at BETWEEN NOW() + INTERVAL '50 minutes' AND NOW() + INTERVAL '70 minutes'
+               THEN '1h'
+           ELSE NULL
+           END AS reminder_type,
+       0,
+       NOW()
+FROM appointments a
+WHERE a.status = 'confirmed'
+  AND (
+    (a.reminder_24h_sent_at IS NULL AND a.starts_at BETWEEN NOW() + INTERVAL '23 hours' AND NOW() + INTERVAL '25 hours')
+        OR
+    (a.reminder_1h_sent_at IS NULL AND a.starts_at BETWEEN NOW() + INTERVAL '50 minutes' AND NOW() + INTERVAL '70 minutes')
+    )
+ON CONFLICT (appointment_id, reminder_type) DO NOTHING;
