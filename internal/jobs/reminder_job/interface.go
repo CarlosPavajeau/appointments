@@ -7,8 +7,9 @@ import (
 )
 
 type Config struct {
-	DB       db.Database
-	Whatsapp whatsapp.Client
+	DB            db.Database
+	Whatsapp      whatsapp.Client
+	EncryptionKey []byte
 }
 
 type ReminderJob interface {

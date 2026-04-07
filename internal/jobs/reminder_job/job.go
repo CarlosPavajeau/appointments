@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"wappiz/pkg/crypto"
 	"wappiz/pkg/date_formatter"
 	"wappiz/pkg/db"
 	"wappiz/pkg/logger"
@@ -14,14 +15,16 @@ import (
 )
 
 type job struct {
-	db       db.Database
-	whatsapp whatsapp.Client
+	db            db.Database
+	whatsapp      whatsapp.Client
+	encryptionKey []byte
 }
 
 func New(cfg Config) *job {
 	return &job{
-		db:       cfg.DB,
-		whatsapp: cfg.Whatsapp,
+		db:            cfg.DB,
+		whatsapp:      cfg.Whatsapp,
+		encryptionKey: cfg.EncryptionKey,
 	}
 }
 
@@ -141,9 +144,12 @@ func (j *job) sendReminder(
 		date_formatter.FormatTime(reminder.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
 	)
 
-	if err := j.whatsapp.SendText(ctx, customer.PhoneNumber,
-		waConfig.PhoneNumberID.String, waConfig.AccessToken.String, body,
-	); err != nil {
+	decrypted, err := crypto.Decrypt(waConfig.AccessToken.String, j.encryptionKey)
+	if err != nil {
+		return err
+	}
+
+	if err := j.whatsapp.SendText(ctx, customer.PhoneNumber, waConfig.PhoneNumberID.String, decrypted, body); err != nil {
 		return err
 	}
 
