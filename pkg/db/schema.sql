@@ -136,14 +136,16 @@ CREATE TABLE conversation_sessions
 
 CREATE TABLE customers
 (
-    id           uuid                     default gen_random_uuid() NOT NULL
+    id                uuid                     default gen_random_uuid() NOT NULL
         CONSTRAINT clients_pkey PRIMARY KEY,
-    tenant_id    uuid                                               NOT NULL
+    tenant_id         uuid                                               NOT NULL
         CONSTRAINT clients_tenant_id_fkey REFERENCES tenants ON DELETE CASCADE,
-    phone_number varchar(20)                                        NOT NULL,
-    name         varchar(255),
-    is_blocked   boolean                  default false             NOT NULL,
-    created_at   timestamp with time zone default now()             NOT NULL,
+    phone_number      varchar(20)                                        NOT NULL,
+    name              varchar(255),
+    is_blocked        boolean                  default false             NOT NULL,
+    created_at        timestamp with time zone default now()             NOT NULL,
+    no_show_count     integer                  default 0                 NOT NULL,
+    late_cancel_count integer                  default 0                 NOT NULL,
     CONSTRAINT clients_tenant_id_phone_number_key
         UNIQUE (tenant_id, phone_number)
 );

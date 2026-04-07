@@ -185,7 +185,7 @@ type Querier interface {
 	//  FROM customers
 	//  WHERE id = $1
 	//  LIMIT 1
-	FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (Customer, error)
+	FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (FindCustomerByIDRow, error)
 	//FindCustomerByPhoneNumber
 	//
 	//  SELECT id, tenant_id, phone_number, name, is_blocked, created_at
@@ -193,10 +193,17 @@ type Querier interface {
 	//  WHERE tenant_id = $1
 	//    AND phone_number = $2
 	//  LIMIT 1
-	FindCustomerByPhoneNumber(ctx context.Context, db DBTX, arg FindCustomerByPhoneNumberParams) (Customer, error)
+	FindCustomerByPhoneNumber(ctx context.Context, db DBTX, arg FindCustomerByPhoneNumberParams) (FindCustomerByPhoneNumberRow, error)
 	//FindCustomersByTenant
 	//
-	//  SELECT id, tenant_id, phone_number, name, is_blocked, created_at
+	//  SELECT id,
+	//         tenant_id,
+	//         phone_number,
+	//         name,
+	//         is_blocked,
+	//         created_at,
+	//         no_show_count,
+	//         late_cancel_count
 	//  FROM customers
 	//  WHERE tenant_id = $1
 	//  ORDER BY created_at DESC

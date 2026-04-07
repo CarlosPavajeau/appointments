@@ -10,11 +10,13 @@ import (
 )
 
 type Response struct {
-	ID          uuid.UUID `json:"id"`
-	PhoneNumber string    `json:"phoneNumber"`
-	Name        *string   `json:"name"`
-	DisplayName string    `json:"displayName"`
-	IsBlocked   bool      `json:"isBlocked"`
+	ID              uuid.UUID `json:"id"`
+	PhoneNumber     string    `json:"phoneNumber"`
+	Name            *string   `json:"name"`
+	DisplayName     string    `json:"displayName"`
+	IsBlocked       bool      `json:"isBlocked"`
+	NoShowCount     int32     `json:"noShowCount"`
+	LateCancelCount int32     `json:"lateCancelCount"`
 }
 
 type Handler struct {
@@ -34,11 +36,13 @@ func toResponse(c db.Customer) Response {
 		displayName = c.Name.String
 	}
 	return Response{
-		ID:          c.ID,
-		PhoneNumber: c.PhoneNumber,
-		Name:        name,
-		DisplayName: displayName,
-		IsBlocked:   c.IsBlocked,
+		ID:              c.ID,
+		PhoneNumber:     c.PhoneNumber,
+		Name:            name,
+		DisplayName:     displayName,
+		IsBlocked:       c.IsBlocked,
+		NoShowCount:     c.NoShowCount,
+		LateCancelCount: c.LateCancelCount,
 	}
 }
 

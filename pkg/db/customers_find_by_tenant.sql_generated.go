@@ -12,7 +12,14 @@ import (
 )
 
 const findCustomersByTenant = `-- name: FindCustomersByTenant :many
-SELECT id, tenant_id, phone_number, name, is_blocked, created_at
+SELECT id,
+       tenant_id,
+       phone_number,
+       name,
+       is_blocked,
+       created_at,
+       no_show_count,
+       late_cancel_count
 FROM customers
 WHERE tenant_id = $1
 ORDER BY created_at DESC
@@ -20,7 +27,14 @@ ORDER BY created_at DESC
 
 // FindCustomersByTenant
 //
-//	SELECT id, tenant_id, phone_number, name, is_blocked, created_at
+//	SELECT id,
+//	       tenant_id,
+//	       phone_number,
+//	       name,
+//	       is_blocked,
+//	       created_at,
+//	       no_show_count,
+//	       late_cancel_count
 //	FROM customers
 //	WHERE tenant_id = $1
 //	ORDER BY created_at DESC
@@ -40,6 +54,8 @@ func (q *Queries) FindCustomersByTenant(ctx context.Context, db DBTX, tenantID u
 			&i.Name,
 			&i.IsBlocked,
 			&i.CreatedAt,
+			&i.NoShowCount,
+			&i.LateCancelCount,
 		); err != nil {
 			return nil, err
 		}

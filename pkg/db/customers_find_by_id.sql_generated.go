@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -18,15 +20,24 @@ WHERE id = $1
 LIMIT 1
 `
 
+type FindCustomerByIDRow struct {
+	ID          uuid.UUID      `db:"id"`
+	TenantID    uuid.UUID      `db:"tenant_id"`
+	PhoneNumber string         `db:"phone_number"`
+	Name        sql.NullString `db:"name"`
+	IsBlocked   bool           `db:"is_blocked"`
+	CreatedAt   time.Time      `db:"created_at"`
+}
+
 // FindCustomerByID
 //
 //	SELECT id, tenant_id, phone_number, name, is_blocked, created_at
 //	FROM customers
 //	WHERE id = $1
 //	LIMIT 1
-func (q *Queries) FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (Customer, error) {
+func (q *Queries) FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (FindCustomerByIDRow, error) {
 	row := db.QueryRowContext(ctx, findCustomerByID, id)
-	var i Customer
+	var i FindCustomerByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,

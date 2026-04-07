@@ -137,16 +137,6 @@ type AppointmentStatusHistory struct {
 	CreatedAt     time.Time         `db:"created_at"`
 }
 
-type Conversation struct {
-	ID          int64          `db:"id"`
-	CreatedAt   sql.NullTime   `db:"created_at"`
-	UpdatedAt   sql.NullTime   `db:"updated_at"`
-	DeletedAt   sql.NullTime   `db:"deleted_at"`
-	Phone       string         `db:"phone"`
-	CurrentStep sql.NullString `db:"current_step"`
-	TempData    []byte         `db:"temp_data"`
-}
-
 type ConversationSession struct {
 	ID               uuid.UUID       `db:"id"`
 	TenantID         uuid.UUID       `db:"tenant_id"`
@@ -160,12 +150,14 @@ type ConversationSession struct {
 }
 
 type Customer struct {
-	ID          uuid.UUID      `db:"id"`
-	TenantID    uuid.UUID      `db:"tenant_id"`
-	PhoneNumber string         `db:"phone_number"`
-	Name        sql.NullString `db:"name"`
-	IsBlocked   bool           `db:"is_blocked"`
-	CreatedAt   time.Time      `db:"created_at"`
+	ID              uuid.UUID      `db:"id"`
+	TenantID        uuid.UUID      `db:"tenant_id"`
+	PhoneNumber     string         `db:"phone_number"`
+	Name            sql.NullString `db:"name"`
+	IsBlocked       bool           `db:"is_blocked"`
+	CreatedAt       time.Time      `db:"created_at"`
+	NoShowCount     int32          `db:"no_show_count"`
+	LateCancelCount int32          `db:"late_cancel_count"`
 }
 
 type OnboardingProgress struct {

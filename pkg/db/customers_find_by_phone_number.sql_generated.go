@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -24,6 +26,15 @@ type FindCustomerByPhoneNumberParams struct {
 	PhoneNumber string    `db:"phone_number"`
 }
 
+type FindCustomerByPhoneNumberRow struct {
+	ID          uuid.UUID      `db:"id"`
+	TenantID    uuid.UUID      `db:"tenant_id"`
+	PhoneNumber string         `db:"phone_number"`
+	Name        sql.NullString `db:"name"`
+	IsBlocked   bool           `db:"is_blocked"`
+	CreatedAt   time.Time      `db:"created_at"`
+}
+
 // FindCustomerByPhoneNumber
 //
 //	SELECT id, tenant_id, phone_number, name, is_blocked, created_at
@@ -31,9 +42,9 @@ type FindCustomerByPhoneNumberParams struct {
 //	WHERE tenant_id = $1
 //	  AND phone_number = $2
 //	LIMIT 1
-func (q *Queries) FindCustomerByPhoneNumber(ctx context.Context, db DBTX, arg FindCustomerByPhoneNumberParams) (Customer, error) {
+func (q *Queries) FindCustomerByPhoneNumber(ctx context.Context, db DBTX, arg FindCustomerByPhoneNumberParams) (FindCustomerByPhoneNumberRow, error) {
 	row := db.QueryRowContext(ctx, findCustomerByPhoneNumber, arg.TenantID, arg.PhoneNumber)
-	var i Customer
+	var i FindCustomerByPhoneNumberRow
 	err := row.Scan(
 		&i.ID,
 		&i.TenantID,
