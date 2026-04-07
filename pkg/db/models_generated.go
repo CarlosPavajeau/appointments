@@ -126,6 +126,16 @@ type Appointment struct {
 	CompletedAt       sql.NullTime      `db:"completed_at"`
 }
 
+type AppointmentPenaltyEvent struct {
+	ID            uuid.UUID `db:"id"`
+	AppointmentID uuid.UUID `db:"appointment_id"`
+	TenantID      uuid.UUID `db:"tenant_id"`
+	CustomerID    uuid.UUID `db:"customer_id"`
+	EventType     string    `db:"event_type"`
+	OccurredAt    time.Time `db:"occurred_at"`
+	CreatedAt     time.Time `db:"created_at"`
+}
+
 type AppointmentStatusHistory struct {
 	ID            uuid.UUID         `db:"id"`
 	AppointmentID uuid.UUID         `db:"appointment_id"`

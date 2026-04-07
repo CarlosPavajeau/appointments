@@ -119,6 +119,25 @@ CREATE TABLE appointment_status_history
     created_at      timestamp with time zone default now()             NOT NULL
 );
 
+CREATE TABLE appointment_penalty_events
+(
+    id             uuid                     default gen_random_uuid() NOT NULL
+        PRIMARY KEY,
+    appointment_id uuid                                               NOT NULL
+        REFERENCES appointments
+            ON DELETE CASCADE,
+    tenant_id      uuid                                               NOT NULL
+        REFERENCES tenants
+            ON DELETE CASCADE,
+    customer_id    uuid                                               NOT NULL
+        REFERENCES customers
+            ON DELETE CASCADE,
+    event_type     varchar(20)                                        NOT NULL,
+    occurred_at    timestamp with time zone                           NOT NULL,
+    created_at     timestamp with time zone default now()             NOT NULL,
+    CONSTRAINT appointment_penalty_events_unique UNIQUE (appointment_id, event_type)
+);
+
 CREATE TABLE conversation_sessions
 (
     id                 uuid                     DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -257,6 +276,15 @@ CREATE INDEX idx_appointments_reminder
 
 CREATE INDEX idx_appointments_status_date
     ON appointments (tenant_id, status, starts_at);
+CREATE INDEX idx_appointments_cancelled_recent
+    ON appointments (cancelled_at DESC)
+    WHERE status = 'cancelled'::appointment_status
+      AND cancelled_at IS NOT NULL;
+CREATE INDEX idx_appointments_unattended
+    ON appointments (starts_at)
+    WHERE status = 'confirmed'::appointment_status;
 CREATE INDEX idx_status_history_appointment ON appointment_status_history (appointment_id);
+CREATE INDEX idx_appointment_penalty_events_customer
+    ON appointment_penalty_events (tenant_id, customer_id, occurred_at DESC);
 CREATE INDEX idx_sessions_active_lookup
     ON conversation_sessions (tenant_id, customer_id, expires_at);

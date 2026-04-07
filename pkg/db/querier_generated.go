@@ -190,6 +190,14 @@ type Querier interface {
 	//    AND phone_number = $2
 	//  LIMIT 1
 	FindCustomerByPhoneNumber(ctx context.Context, db DBTX, arg FindCustomerByPhoneNumberParams) (FindCustomerByPhoneNumberRow, error)
+	//FindCustomerPenaltyCounts
+	//
+	//  SELECT no_show_count,
+	//         late_cancel_count
+	//  FROM customers
+	//  WHERE id = $1
+	//    AND tenant_id = $2
+	FindCustomerPenaltyCounts(ctx context.Context, db DBTX, arg FindCustomerPenaltyCountsParams) (FindCustomerPenaltyCountsRow, error)
 	//FindCustomersByTenant
 	//
 	//  SELECT id,
@@ -541,6 +549,48 @@ type Querier interface {
 	//  SET no_show_count = no_show_count + 1
 	//  WHERE id = $1 AND tenant_id = $2
 	IncrementCustomerNoShows(ctx context.Context, db DBTX, arg IncrementCustomerNoShowsParams) error
+	//IncrementCustomersLateCancelsBatch
+	//
+	//  WITH args AS (
+	//      SELECT
+	//          $1::uuid[] AS customer_ids,
+	//          $2::uuid[] AS tenant_ids,
+	//          $3::int[] AS increments
+	//  ),
+	//  updates AS (
+	//      SELECT
+	//          UNNEST(args.customer_ids) AS customer_id,
+	//          UNNEST(args.tenant_ids) AS tenant_id,
+	//          UNNEST(args.increments) AS increment_by
+	//      FROM args
+	//  )
+	//  UPDATE customers AS c
+	//  SET late_cancel_count = c.late_cancel_count + updates.increment_by
+	//  FROM updates
+	//  WHERE c.id = updates.customer_id
+	//    AND c.tenant_id = updates.tenant_id
+	IncrementCustomersLateCancelsBatch(ctx context.Context, db DBTX, arg IncrementCustomersLateCancelsBatchParams) error
+	//IncrementCustomersNoShowsBatch
+	//
+	//  WITH args AS (
+	//      SELECT
+	//          $1::uuid[] AS customer_ids,
+	//          $2::uuid[] AS tenant_ids,
+	//          $3::int[] AS increments
+	//  ),
+	//  updates AS (
+	//      SELECT
+	//          UNNEST(args.customer_ids) AS customer_id,
+	//          UNNEST(args.tenant_ids) AS tenant_id,
+	//          UNNEST(args.increments) AS increment_by
+	//      FROM args
+	//  )
+	//  UPDATE customers AS c
+	//  SET no_show_count = c.no_show_count + updates.increment_by
+	//  FROM updates
+	//  WHERE c.id = updates.customer_id
+	//    AND c.tenant_id = updates.tenant_id
+	IncrementCustomersNoShowsBatch(ctx context.Context, db DBTX, arg IncrementCustomersNoShowsBatchParams) error
 	//InsertAppointment
 	//
 	//  INSERT INTO appointments(
@@ -565,6 +615,27 @@ type Querier interface {
 	//      $8
 	//  )
 	InsertAppointment(ctx context.Context, db DBTX, arg InsertAppointmentParams) error
+	//InsertAppointmentPenaltyEvent
+	//
+	//  INSERT INTO appointment_penalty_events(
+	//      id,
+	//      appointment_id,
+	//      tenant_id,
+	//      customer_id,
+	//      event_type,
+	//      occurred_at,
+	//      created_at
+	//  ) VALUES (
+	//      $1,
+	//      $2,
+	//      $3,
+	//      $4,
+	//      $5,
+	//      $6,
+	//      NOW()
+	//  )
+	//  ON CONFLICT (appointment_id, event_type) DO NOTHING
+	InsertAppointmentPenaltyEvent(ctx context.Context, db DBTX, arg InsertAppointmentPenaltyEventParams) (int64, error)
 	//InsertAppointmentStatusHistory
 	//
 	//  INSERT INTO appointment_status_history(
@@ -751,6 +822,19 @@ type Querier interface {
 	//      reminder_1h_sent_at  = COALESCE(reminder_1h_sent_at, $2)
 	//  WHERE id = $3
 	Mark24hAppointmentReminderSent(ctx context.Context, db DBTX, arg Mark24hAppointmentReminderSentParams) error
+	//MarkUnattendedAppointmentsNoShow
+	//
+	//  UPDATE appointments
+	//  SET status = 'no_show',
+	//      updated_at = NOW(),
+	//      cancelled_by = NULL,
+	//      cancel_reason = NULL,
+	//      cancelled_at = NULL,
+	//      completed_at = NULL
+	//  WHERE status = 'confirmed'
+	//    AND starts_at <= NOW() - INTERVAL '30 minutes'
+	//  RETURNING id, tenant_id, customer_id
+	MarkUnattendedAppointmentsNoShow(ctx context.Context, db DBTX) ([]MarkUnattendedAppointmentsNoShowRow, error)
 	//SearchAppointments
 	//
 	//  SELECT a.id,
@@ -785,6 +869,11 @@ type Querier interface {
 	//  UPDATE appointments
 	//  SET status        = $1,
 	//      updated_at    = NOW(),
+	//      cancelled_at  = CASE
+	//                          WHEN $1 = 'cancelled'::appointment_status THEN COALESCE(cancelled_at, NOW())
+	//                          WHEN status = 'cancelled'::appointment_status THEN NULL
+	//                          ELSE cancelled_at
+	//          END,
 	//      cancelled_by  = $2,
 	//      cancel_reason = $3,
 	//      completed_at  = $4
