@@ -142,7 +142,7 @@ func (h *Handler) processPayload(req Request) {
 				}
 
 				if err := h.StateMachine.Process(ctx, *incoming); err != nil {
-					logger.Warn("webhook: error processing message from %s: %v",
+					logger.Warn("webhook: error processing message from",
 						"from", msg.From,
 						"err", err)
 				}
