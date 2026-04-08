@@ -368,6 +368,9 @@ func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, ses
 
 	if !result.SlotTaken {
 		sessionData.StartsAt = &result.StartsAt
+		if result.ResourceID != nil {
+			sessionData.ResourceID = result.ResourceID
+		}
 		sessionData.DateAttempts = 0
 
 		return s.advanceToConfirmOrName(ctx, msg, session, sessionData, customer)
@@ -438,7 +441,11 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 
 		for _, slot := range slots {
 			if slot.StartsAt.Equal(t) {
-				return &DateValidationResult{StartsAt: t}, nil
+				resourceID := *sessionData.ResourceID
+				return &DateValidationResult{
+					StartsAt:   t,
+					ResourceID: &resourceID,
+				}, nil
 			}
 		}
 
@@ -483,9 +490,11 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 
 		for _, slot := range slots {
 			if slot.StartsAt.Equal(t) {
-				result := &DateValidationResult{StartsAt: t}
-				// Assign the resource that has the slot available
-				return result, nil
+				resourceID := res.ID
+				return &DateValidationResult{
+					StartsAt:   t,
+					ResourceID: &resourceID,
+				}, nil
 			}
 		}
 	}

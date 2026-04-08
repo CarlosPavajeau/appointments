@@ -33,6 +33,7 @@ type SessionData struct {
 
 type DateValidationResult struct {
 	StartsAt  time.Time
+	ResourceID *uuid.UUID
 	Slots     []slot_finder.TimeSlot // empty if is available
 	SlotTaken bool
 }
