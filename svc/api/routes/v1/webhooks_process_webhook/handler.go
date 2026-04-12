@@ -78,9 +78,9 @@ type Status struct {
 }
 
 type Handler struct {
-	DB            db.Database
-	StateMachine  state_machine.StateMachineService
-	EncryptionKey []byte
+	DB           db.Database
+	StateMachine state_machine.StateMachineService
+	Crypto       *crypto.Service
 }
 
 func (h *Handler) Method() string {
@@ -159,7 +159,7 @@ func (h *Handler) processPayload(req Request) {
 }
 
 func (h *Handler) buildIncomingMessage(msg Message, metadata Metadata, waConfig db.FindTenantWhatsappConfigByPhoneNumberIDRow) (*state_machine.IncomingMessage, error) {
-	accessToken, err := crypto.Decrypt(waConfig.AccessToken.String, h.EncryptionKey)
+	accessToken, err := h.Crypto.Decrypt(waConfig.AccessToken.String)
 	if err != nil {
 		return nil, err
 	}

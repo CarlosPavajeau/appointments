@@ -21,9 +21,9 @@ type Request struct {
 }
 
 type Handler struct {
-	DB            db.Database
-	Mailer        mailer.Mailer
-	EncryptionKey []byte
+	DB     db.Database
+	Mailer mailer.Mailer
+	Crypto *crypto.Service
 }
 
 func (h *Handler) Method() string {
@@ -47,9 +47,10 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := crypto.Encrypt(req.AccessToken, h.EncryptionKey)
+	accessToken, err := h.Crypto.Encrypt(req.AccessToken)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
 	err = db.Query.ActivateTenantWhatsappConfig(c.Request.Context(), h.DB.Primary(), db.ActivateTenantWhatsappConfigParams{

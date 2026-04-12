@@ -15,16 +15,16 @@ import (
 )
 
 type job struct {
-	db            db.Database
-	whatsapp      whatsapp.Client
-	encryptionKey []byte
+	db       db.Database
+	whatsapp whatsapp.Client
+	crypto   *crypto.Service
 }
 
 func New(cfg Config) *job {
 	return &job{
-		db:            cfg.DB,
-		whatsapp:      cfg.Whatsapp,
-		encryptionKey: cfg.EncryptionKey,
+		db:       cfg.DB,
+		whatsapp: cfg.Whatsapp,
+		crypto:   cfg.Crypto,
 	}
 }
 
@@ -144,7 +144,7 @@ func (j *job) sendReminder(
 		date_formatter.FormatTime(reminder.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
 	)
 
-	decrypted, err := crypto.Decrypt(waConfig.AccessToken.String, j.encryptionKey)
+	decrypted, err := j.crypto.Decrypt(waConfig.AccessToken.String)
 	if err != nil {
 		return err
 	}

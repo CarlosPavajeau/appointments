@@ -127,9 +127,9 @@ func Register(g *gin.Engine, svc *Services) {
 
 	RegisterRoute(admin, &admin_find_pending_activations.Handler{DB: svc.Database})
 	RegisterRoute(admin, &admin_activate_tenant.Handler{
-		DB:            svc.Database,
-		Mailer:        svc.Mailer,
-		EncryptionKey: svc.EncryptionKey,
+		DB:     svc.Database,
+		Mailer: svc.Mailer,
+		Crypto: svc.Crypto,
 	})
 
 	// webhooks
@@ -137,9 +137,9 @@ func Register(g *gin.Engine, svc *Services) {
 
 	webhook := g.Group("/", middleware.WhatsAppSignature(svc.AppSecret))
 	RegisterRoute(webhook, &webhooks_process_webhook.Handler{
-		DB:            svc.Database,
-		StateMachine:  svc.StateMachine,
-		EncryptionKey: svc.EncryptionKey,
+		DB:           svc.Database,
+		StateMachine: svc.StateMachine,
+		Crypto:       svc.Crypto,
 	})
 }
 
