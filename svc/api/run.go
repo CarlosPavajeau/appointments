@@ -27,6 +27,13 @@ import (
 
 // nolint:gocognit
 func Run(ctx context.Context, cfg Config) error {
+	if cfg.Logging != nil {
+		logger.SetSampler(logger.TailSampler{
+			SlowThreshold: cfg.Logging.SlowThreshold,
+			SampleRate:    cfg.Logging.SampleRate,
+		})
+	}
+
 	r := runner.New()
 	defer r.Recover()
 

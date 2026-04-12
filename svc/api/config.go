@@ -2,10 +2,25 @@ package api
 
 import (
 	"os"
+	"strconv"
+	"time"
 	"wappiz/pkg/logger"
 
 	"github.com/joho/godotenv"
 )
+
+// LoggingConfig controls log sampling. Events faster than SlowThreshold are
+// emitted with probability SampleRate; events at or above the threshold are
+// always emitted.
+type LoggingConfig struct {
+	// SampleRate is the probability (0.0–1.0) of emitting a fast log event.
+	// Set to 1.0 to log everything.
+	SampleRate float64
+
+	// SlowThreshold is the duration above which a request is always logged
+	// regardless of SampleRate.
+	SlowThreshold time.Duration
+}
 
 // Config holds all runtime configuration values for the API server,
 // populated from environment variables (or a .env file).
@@ -39,6 +54,8 @@ type Config struct {
 	// JWTIssuer is the expected "iss" claim value for incoming JWTs (JWT_ISSUER).
 	// Optional — when empty the issuer claim is not validated.
 	JWTIssuer string
+	// Logging controls log sampling behavior.
+	Logging *LoggingConfig
 }
 
 // LoadConfiguration reads configuration from a .env file if present, then falls back
@@ -47,6 +64,23 @@ type Config struct {
 func LoadConfiguration() Config {
 	if err := godotenv.Load(); err != nil {
 		logger.Info("no .env file found, using environment variables")
+	}
+
+	var sampleRate float64
+	if srStr := getOrDefault("LOG_SAMPLE_RATE", "1.0"); srStr != "" {
+		var err error
+		sampleRate, err = strconv.ParseFloat(srStr, 64)
+		if err != nil {
+			sampleRate = 1.0
+		}
+	}
+
+	var slowThreshold time.Duration
+	if slowThresholdStr := getOrDefault("LOG_SLOW_THRESHOLD", "5s"); slowThresholdStr != "" {
+		var err error
+		if slowThreshold, err = time.ParseDuration(slowThresholdStr); err != nil {
+			slowThreshold = 5 * time.Second
+		}
 	}
 
 	return Config{
@@ -62,6 +96,10 @@ func LoadConfiguration() Config {
 		ResendFromEmail:    mustGet("RESEND_FROM_EMAIL"),
 		JWKSEndpoint:       mustGet("JWKS_ENDPOINT"),
 		JWTIssuer:          os.Getenv("JWT_ISSUER"), // optional
+		Logging: &LoggingConfig{
+			SampleRate:    sampleRate,
+			SlowThreshold: slowThreshold,
+		},
 	}
 }
 
