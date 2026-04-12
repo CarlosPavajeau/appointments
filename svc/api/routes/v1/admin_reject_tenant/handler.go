@@ -65,11 +65,12 @@ func (h *Handler) Handle(c *gin.Context) {
 	waConfig, err := db.Query.FindTenantWhatsappConfig(ctx, h.DB.Primary(), tenantID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			logger.Warn("[admin] whatsapp config missing after activation", "tenant_id", tenantID)
+			logger.Warn("[admin] whatsapp config missing", "tenant_id", tenantID)
 			c.JSON(http.StatusNotFound, gin.H{"error": "whatsapp config not found"})
 			return
 		}
-		logger.Warn("[admin] fetch whatsapp config after activation", "tenant_id", tenantID, "err", err)
+
+		logger.Warn("[admin] fetch whatsapp config", "tenant_id", tenantID, "err", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load whatsapp config"})
 		return
 	}
