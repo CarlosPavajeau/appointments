@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"time"
 	"wappiz/pkg/crypto"
@@ -143,6 +144,9 @@ func scheduleActivationEmail(m mailer.Mailer, tenantID uuid.UUID, to, tenantName
 
 func buildActivationEmail(tenantName, phoneNumber string) string {
 	waLink := "https://wa.me/" + sanitizePhone(phoneNumber)
+	safeName := html.EscapeString(tenantName)
+	safePhone := html.EscapeString(phoneNumber)
+	safeLink := html.EscapeString(waLink)
 	return fmt.Sprintf(`
 		<h2>🎉 ¡Tu barbería ya puede recibir citas!</h2>
 		<p>Hola <strong>%s</strong>,</p>
@@ -150,7 +154,7 @@ func buildActivationEmail(tenantName, phoneNumber string) string {
 		<h3>📱 Número de tu barbería:<br>%s</h3>
 		<p>Dale este número a tus clientes o comparte el enlace directo:</p>
 		<p><a href="%s">%s</a></p>
-	`, tenantName, phoneNumber, waLink, waLink)
+	`, safeName, safePhone, safeLink, safeLink)
 }
 
 func sanitizePhone(phone string) string {
