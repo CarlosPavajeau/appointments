@@ -729,6 +729,10 @@ func (s *service) handleOverlapOnConfirm(
 	}
 
 	if len(filteredSuggestions) == 0 {
+		session.Step = string(StepSelectDate)
+		if _, err = s.updateSession(ctx, session, sessionData); err != nil {
+			return fmt.Errorf("update session: %w", err)
+		}
 		return nil
 	}
 
