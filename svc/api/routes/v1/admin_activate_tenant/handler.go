@@ -136,7 +136,6 @@ func scheduleActivationEmail(m mailer.Mailer, tenantID uuid.UUID, to, tenantName
 		}); err != nil {
 			logger.Warn("[admin] activation notification email",
 				"tenant_id", tenantID,
-				"to", to,
 				"err", err)
 		}
 	}(tenantID, to, body)
