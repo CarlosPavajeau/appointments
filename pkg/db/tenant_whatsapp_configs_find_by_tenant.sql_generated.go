@@ -22,6 +22,7 @@ SELECT id,
        access_token,
        token_expires_at,
        is_active,
+       activation_contact_email,
        verified_at,
        created_at,
        updated_at
@@ -32,17 +33,18 @@ LIMIT 1
 `
 
 type FindTenantWhatsappConfigRow struct {
-	ID                 uuid.UUID      `db:"id"`
-	TenantID           uuid.UUID      `db:"tenant_id"`
-	WabaID             sql.NullString `db:"waba_id"`
-	PhoneNumberID      sql.NullString `db:"phone_number_id"`
-	DisplayPhoneNumber sql.NullString `db:"display_phone_number"`
-	AccessToken        sql.NullString `db:"access_token"`
-	TokenExpiresAt     sql.NullTime   `db:"token_expires_at"`
-	IsActive           bool           `db:"is_active"`
-	VerifiedAt         sql.NullTime   `db:"verified_at"`
-	CreatedAt          time.Time      `db:"created_at"`
-	UpdatedAt          time.Time      `db:"updated_at"`
+	ID                     uuid.UUID      `db:"id"`
+	TenantID               uuid.UUID      `db:"tenant_id"`
+	WabaID                 sql.NullString `db:"waba_id"`
+	PhoneNumberID          sql.NullString `db:"phone_number_id"`
+	DisplayPhoneNumber     sql.NullString `db:"display_phone_number"`
+	AccessToken            sql.NullString `db:"access_token"`
+	TokenExpiresAt         sql.NullTime   `db:"token_expires_at"`
+	IsActive               bool           `db:"is_active"`
+	ActivationContactEmail sql.NullString `db:"activation_contact_email"`
+	VerifiedAt             sql.NullTime   `db:"verified_at"`
+	CreatedAt              time.Time      `db:"created_at"`
+	UpdatedAt              time.Time      `db:"updated_at"`
 }
 
 // FindTenantWhatsappConfig
@@ -55,6 +57,7 @@ type FindTenantWhatsappConfigRow struct {
 //	       access_token,
 //	       token_expires_at,
 //	       is_active,
+//	       activation_contact_email,
 //	       verified_at,
 //	       created_at,
 //	       updated_at
@@ -74,6 +77,7 @@ func (q *Queries) FindTenantWhatsappConfig(ctx context.Context, db DBTX, tenantI
 		&i.AccessToken,
 		&i.TokenExpiresAt,
 		&i.IsActive,
+		&i.ActivationContactEmail,
 		&i.VerifiedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,

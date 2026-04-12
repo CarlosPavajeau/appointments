@@ -7,6 +7,7 @@ SELECT id,
        access_token,
        token_expires_at,
        is_active,
+       activation_contact_email,
        verified_at,
        created_at,
        updated_at
