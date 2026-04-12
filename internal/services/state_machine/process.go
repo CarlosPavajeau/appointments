@@ -920,7 +920,7 @@ func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, 
 }
 
 func (s *service) sendServiceList(ctx context.Context, msg IncomingMessage) error {
-	svcs, err := db.Query.FindServicesByTenantID(ctx, s.db.Primary(), msg.TenantID)
+	svcs, err := db.Query.FindServicesWithAssignedResourceByTenantID(ctx, s.db.Primary(), msg.TenantID)
 	if err != nil {
 		return err
 	}
