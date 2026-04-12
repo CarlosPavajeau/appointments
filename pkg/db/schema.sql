@@ -101,7 +101,10 @@ CREATE TABLE appointments
     cancelled_at         timestamp with time zone,
     completed_at         timestamp with time zone,
     CONSTRAINT no_overlap
-        EXCLUDE USING gist (resource_id with =, tstzrange(starts_at, ends_at) with &&)
+        EXCLUDE USING gist (resource_id with =, tstzrange(starts_at, ends_at) with &&),
+    CONSTRAINT no_customer_overlap
+        EXCLUDE USING gist (tenant_id with =, customer_id with =, tstzrange(starts_at, ends_at) with &&)
+            WHERE (status <> ALL (ARRAY ['cancelled'::appointment_status, 'no_show'::appointment_status]))
 );
 
 CREATE TABLE appointment_status_history

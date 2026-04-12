@@ -630,9 +630,11 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			EndsAt:         endsAt,
 			PriceAtBooking: svc.Price,
 		}); err != nil {
-			if strings.Contains(err.Error(), "no_overlap") || strings.Contains(err.Error(), "exclusion constraint") {
+			// The DB exclusion constraints are the authoritative source for overlap checks.
+			if isAppointmentOverlapConstraintError(err) {
 				logger.Warn("[scheduling] appointment overlap detected on confirm, informing customer",
-					"session_id", session.ID)
+					"session_id", session.ID,
+					"err", err)
 				return s.handleOverlapOnConfirm(ctx, msg, session, sessionData, svc)
 			}
 			return fmt.Errorf("insert appointment: %w", err)
@@ -736,6 +738,19 @@ func (s *service) hasCustomerOverlap(
 		StartsAt:   startsAt,
 		EndsAt:     endsAt,
 	})
+}
+
+func isAppointmentOverlapConstraintError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := err.Error()
+
+	// Handle both legacy resource overlap and customer overlap constraints.
+	return strings.Contains(msg, "no_overlap") ||
+		strings.Contains(msg, "no_customer_overlap") ||
+		strings.Contains(msg, "exclusion constraint")
 }
 
 func (s *service) handleMyAppointments(ctx context.Context, msg IncomingMessage, customer db.FindCustomerByPhoneNumberRow) error {
