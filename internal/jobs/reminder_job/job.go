@@ -15,16 +15,16 @@ import (
 )
 
 type job struct {
-	db            db.Database
-	whatsapp      whatsapp.Client
-	encryptionKey []byte
+	db       db.Database
+	whatsapp whatsapp.Client
+	crypto   *crypto.Service
 }
 
 func New(cfg Config) *job {
 	return &job{
-		db:            cfg.DB,
-		whatsapp:      cfg.Whatsapp,
-		encryptionKey: cfg.EncryptionKey,
+		db:       cfg.DB,
+		whatsapp: cfg.Whatsapp,
+		crypto:   cfg.Crypto,
 	}
 }
 
@@ -70,6 +70,8 @@ func (j *job) process(ctx context.Context) error {
 
 	waConfigs := make(map[uuid.UUID]db.FindTenantWhatsappConfigRow)
 	customers := make(map[uuid.UUID]db.FindCustomerByIDRow)
+	decryptedByTenant := make(map[uuid.UUID]string)
+	decryptErrByTenant := make(map[uuid.UUID]error)
 
 	for _, reminder := range pending {
 		waConfig, ok := waConfigs[reminder.TenantID]
@@ -94,7 +96,7 @@ func (j *job) process(ctx context.Context) error {
 			customers[reminder.CustomerID] = customer
 		}
 
-		if err := j.sendReminder(ctx, reminder, customer, waConfig); err != nil {
+		if err := j.sendReminder(ctx, reminder, customer, waConfig, decryptedByTenant, decryptErrByTenant); err != nil {
 			j.markReminderFailed(ctx, reminder.ID, err)
 			logger.Warn("[reminder_job] failed to send reminder",
 				"err", err)
@@ -116,6 +118,8 @@ func (j *job) sendReminder(
 	reminder db.FindPendingAppointmentReminderEventsRow,
 	customer db.FindCustomerByIDRow,
 	waConfig db.FindTenantWhatsappConfigRow,
+	decryptedByTenant map[uuid.UUID]string,
+	decryptErrByTenant map[uuid.UUID]error,
 ) error {
 	if !waConfig.PhoneNumberID.Valid || !waConfig.AccessToken.Valid {
 		return nil
@@ -144,7 +148,7 @@ func (j *job) sendReminder(
 		date_formatter.FormatTime(reminder.StartsAt, "Monday, 02 de January de 2006 a las 3:04 PM"),
 	)
 
-	decrypted, err := crypto.Decrypt(waConfig.AccessToken.String, j.encryptionKey)
+	decrypted, err := j.decryptedTokenForTenant(waConfig.TenantID, waConfig.AccessToken.String, decryptedByTenant, decryptErrByTenant)
 	if err != nil {
 		return err
 	}
@@ -154,6 +158,29 @@ func (j *job) sendReminder(
 	}
 
 	return nil
+}
+
+// decryptedTokenForTenant returns the decrypted access token for a tenant, using
+// decryptedByTenant / decryptErrByTenant so each tenant is decrypted at most once per process run.
+func (j *job) decryptedTokenForTenant(
+	tenantID uuid.UUID,
+	ciphertext string,
+	decryptedByTenant map[uuid.UUID]string,
+	decryptErrByTenant map[uuid.UUID]error,
+) (string, error) {
+	if err, ok := decryptErrByTenant[tenantID]; ok {
+		return "", err
+	}
+	if tok, ok := decryptedByTenant[tenantID]; ok {
+		return tok, nil
+	}
+	tok, err := j.crypto.Decrypt(ciphertext)
+	if err != nil {
+		decryptErrByTenant[tenantID] = err
+		return "", err
+	}
+	decryptedByTenant[tenantID] = tok
+	return tok, nil
 }
 
 func (j *job) markReminderSent(ctx context.Context, reminder db.FindPendingAppointmentReminderEventsRow) error {

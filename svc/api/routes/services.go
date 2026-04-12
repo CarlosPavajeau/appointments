@@ -2,6 +2,7 @@ package routes
 
 import (
 	"wappiz/internal/services/state_machine"
+	"wappiz/pkg/crypto"
 	"wappiz/pkg/db"
 	"wappiz/pkg/mailer"
 	"wappiz/pkg/runner"
@@ -23,5 +24,5 @@ type Services struct {
 	Runner        *runner.Runner                    // Runner for managing background tasks and graceful shutdown.
 	AdminEmail    string                            // Destination address for internal admin notifications.
 	AppSecret     string                            // Shared secret used to verify webhook signatures.
-	EncryptionKey []byte                            // AES key used to encrypt sensitive values at rest (e.g. access tokens).
+	Crypto        *crypto.Service                   // AES-GCM encrypt/decrypt for sensitive values at rest (e.g. access tokens).
 }

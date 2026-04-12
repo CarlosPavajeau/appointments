@@ -12,6 +12,7 @@ import (
 	"wappiz/internal/jobs/reminder_job"
 	"wappiz/internal/services/slot_finder"
 	"wappiz/internal/services/state_machine"
+	"wappiz/pkg/crypto"
 	"wappiz/pkg/db"
 	"wappiz/pkg/jwt"
 	"wappiz/pkg/logger"
@@ -38,10 +39,10 @@ func Run(ctx context.Context, cfg Config) error {
 
 	r.Defer(database.Close)
 
-	encKey := []byte(cfg.EncryptionKey)
-	if len(encKey) != 32 {
-		logger.Error("ENCRYPTION_KEY must be exactly 32 bytes")
-		return errors.New("ENCRYPTION_KEY must be exactly 32 bytes")
+	cryptoSvc, err := crypto.NewService([]byte(cfg.EncryptionKey))
+	if err != nil {
+		logger.Error("invalid ENCRYPTION_KEY", "err", err)
+		return err
 	}
 
 	// Initialise the JWKS verifier before any request is served.
@@ -82,26 +83,26 @@ func Run(ctx context.Context, cfg Config) error {
 	g.Use(logMiddleware())
 
 	routes.Register(g, &routes.Services{
-		Database:      database,
-		Mailer:        mailerSvc,
-		Whatsapp:      waSvc,
-		StateMachine:  stateMachineSvc,
-		Runner:        r,
-		AdminEmail:    cfg.AdminEmail,
-		AppSecret:     cfg.WhatsappAppSecret,
-		EncryptionKey: encKey,
+		Database:     database,
+		Mailer:       mailerSvc,
+		Whatsapp:     waSvc,
+		StateMachine: stateMachineSvc,
+		Runner:       r,
+		AdminEmail:   cfg.AdminEmail,
+		AppSecret:    cfg.WhatsappAppSecret,
+		Crypto:       cryptoSvc,
 	})
 
 	reminderJob := reminder_job.New(reminder_job.Config{
-		DB:            database,
-		Whatsapp:      waSvc,
-		EncryptionKey: encKey,
+		DB:       database,
+		Whatsapp: waSvc,
+		Crypto:   cryptoSvc,
 	})
 
 	nowShowTrackerJob := no_show_tracker_job.New(no_show_tracker_job.Config{
-		DB:            database,
-		Whatsapp:      waSvc,
-		EncryptionKey: encKey,
+		DB:       database,
+		Whatsapp: waSvc,
+		Crypto:   cryptoSvc,
 	})
 
 	cleanupSessionJob := cleanup_sessions_job.New(database)

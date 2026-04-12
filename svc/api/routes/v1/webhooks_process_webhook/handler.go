@@ -78,9 +78,9 @@ type Status struct {
 }
 
 type Handler struct {
-	DB            db.Database
-	StateMachine  state_machine.StateMachineService
-	EncryptionKey []byte
+	DB           db.Database
+	StateMachine state_machine.StateMachineService
+	Crypto       *crypto.Service
 }
 
 func (h *Handler) Method() string {
@@ -132,8 +132,17 @@ func (h *Handler) processPayload(req Request) {
 				continue
 			}
 
+			decryptedAccessToken, err := h.Crypto.Decrypt(waConfig.AccessToken.String)
+			if err != nil {
+				logger.Warn("webhook: failed to decrypt access token",
+					"phone_number_id", phoneNumberID,
+					"tenant_id", waConfig.TenantID,
+					"err", err)
+				continue
+			}
+
 			for _, msg := range change.Value.Messages {
-				incoming, err := h.buildIncomingMessage(msg, change.Value.Metadata, waConfig)
+				incoming, err := h.buildIncomingMessage(msg, change.Value.Metadata, waConfig, decryptedAccessToken)
 				if err != nil {
 					logger.Warn("webhook: failed to build message",
 						"from", msg.From,
@@ -158,17 +167,17 @@ func (h *Handler) processPayload(req Request) {
 	}
 }
 
-func (h *Handler) buildIncomingMessage(msg Message, metadata Metadata, waConfig db.FindTenantWhatsappConfigByPhoneNumberIDRow) (*state_machine.IncomingMessage, error) {
-	accessToken, err := crypto.Decrypt(waConfig.AccessToken.String, h.EncryptionKey)
-	if err != nil {
-		return nil, err
-	}
-
+func (h *Handler) buildIncomingMessage(
+	msg Message,
+	metadata Metadata,
+	waConfig db.FindTenantWhatsappConfigByPhoneNumberIDRow,
+	decryptedAccessToken string,
+) (*state_machine.IncomingMessage, error) {
 	incoming := &state_machine.IncomingMessage{
 		TenantID:         waConfig.TenantID,
 		WhatsappConfigID: waConfig.ID,
 		PhoneNumberID:    metadata.PhoneNumberID,
-		AccessToken:      accessToken,
+		AccessToken:      decryptedAccessToken,
 		From:             msg.From,
 		ReceivedAt:       time.Now(),
 	}

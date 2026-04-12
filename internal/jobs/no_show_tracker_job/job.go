@@ -15,9 +15,9 @@ import (
 )
 
 type job struct {
-	db            db.Database
-	whatsapp      whatsapp.Client
-	encryptionKey []byte
+	db       db.Database
+	whatsapp whatsapp.Client
+	crypto   *crypto.Service
 }
 
 type customerTenantKey struct {
@@ -40,9 +40,9 @@ type penaltyCounts struct {
 
 func New(cfg Config) *job {
 	return &job{
-		db:            cfg.DB,
-		whatsapp:      cfg.Whatsapp,
-		encryptionKey: cfg.EncryptionKey,
+		db:       cfg.DB,
+		whatsapp: cfg.Whatsapp,
+		crypto:   cfg.Crypto,
 	}
 }
 
@@ -355,7 +355,7 @@ func (j *job) getTenantWhatsappData(
 
 	accessToken, ok := eCtx.accessTokens[tenantID]
 	if !ok {
-		decrypted, err := crypto.Decrypt(waConfig.AccessToken.String, j.encryptionKey)
+		decrypted, err := j.crypto.Decrypt(waConfig.AccessToken.String)
 		if err != nil {
 			logger.Warn("[no_show_tracker] failed to decrypt tenant whatsapp token",
 				"tenant_id", tenantID,
