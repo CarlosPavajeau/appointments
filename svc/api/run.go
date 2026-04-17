@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 	"wappiz/internal/jobs/cleanup_sessions_job"
@@ -18,6 +19,7 @@ import (
 	"wappiz/pkg/logger"
 	"wappiz/pkg/mailer"
 	"wappiz/pkg/otel"
+	"wappiz/pkg/prometheus"
 	"wappiz/pkg/runner"
 	"wappiz/pkg/whatsapp"
 	"wappiz/svc/api/routes"
@@ -66,6 +68,33 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	r.Defer(database.Close)
+
+	if cfg.Observability.Metrics != nil {
+		prom, promErr := prometheus.New()
+		if promErr != nil {
+			return fmt.Errorf("unable to start prometheus: %w", promErr)
+		}
+
+		promListener, listenErr := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Observability.Metrics.PrometheusPort))
+		if listenErr != nil {
+			return fmt.Errorf("unable to listen on port %d: %w", cfg.Observability.Metrics.PrometheusPort, listenErr)
+		}
+
+		srv := &http.Server{
+			Handler:      prom,
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		}
+
+		r.DeferCtx(srv.Shutdown)
+		r.Go(func(ctx context.Context) error {
+			serveErr := srv.Serve(promListener)
+			if serveErr != nil && !errors.Is(serveErr, context.Canceled) {
+				return fmt.Errorf("prometheus server failed: %w", serveErr)
+			}
+			return nil
+		})
+	}
 
 	cryptoSvc, err := crypto.NewService([]byte(cfg.EncryptionKey))
 	if err != nil {

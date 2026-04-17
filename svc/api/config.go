@@ -31,9 +31,17 @@ type TracingConfig struct {
 	SampleRate float64
 }
 
+// MetricsConfig controls Prometheus metrics exposition.
+type MetricsConfig struct {
+	// PrometheusPort is the TCP port where Prometheus-compatible metrics are served.
+	// Set to 0 to disable metrics exposure.
+	PrometheusPort int
+}
+
 type Observability struct {
 	Tracing *TracingConfig
 	Logging *LoggingConfig
+	Metrics *MetricsConfig
 }
 
 // Config holds all runtime configuration values for the API server,
@@ -100,6 +108,15 @@ func LoadConfiguration() Config {
 		}
 	}
 
+	var prometheusPort int
+	if promPortStr := getOrDefault("PROMETHEUS_PORT", "9090"); promPortStr != "" {
+		var err error
+		prometheusPort, err = strconv.Atoi(promPortStr)
+		if err != nil {
+			prometheusPort = 9090 // Default port for Prometheus metrics
+		}
+	}
+
 	return Config{
 		InstanceID:         mustGet("INSTANCE_ID"),
 		Region:             mustGet("REGION"),
@@ -122,6 +139,9 @@ func LoadConfiguration() Config {
 			Logging: &LoggingConfig{
 				SampleRate:    sampleRate,
 				SlowThreshold: slowThreshold,
+			},
+			Metrics: &MetricsConfig{
+				PrometheusPort: prometheusPort,
 			},
 		},
 	}
