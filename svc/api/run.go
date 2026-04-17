@@ -17,25 +17,45 @@ import (
 	"wappiz/pkg/jwt"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/mailer"
+	"wappiz/pkg/otel"
 	"wappiz/pkg/runner"
 	"wappiz/pkg/whatsapp"
 	"wappiz/svc/api/routes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/common/version"
 )
 
 // nolint:gocognit
 func Run(ctx context.Context, cfg Config) error {
-	if cfg.Logging != nil {
+	if cfg.Observability.Logging != nil {
 		logger.SetSampler(logger.TailSampler{
-			SlowThreshold: cfg.Logging.SlowThreshold,
-			SampleRate:    cfg.Logging.SampleRate,
+			SlowThreshold: cfg.Observability.Logging.SlowThreshold,
+			SampleRate:    cfg.Observability.Logging.SampleRate,
 		})
+	}
+
+	var err error
+	var shutdownGrafana func(context.Context) error
+	if cfg.Observability.Tracing != nil {
+		shutdownGrafana, err = otel.InitGrafana(ctx, otel.Config{
+			Application:     "api",
+			Version:         version.Version,
+			InstanceID:      cfg.InstanceID,
+			CloudRegion:     cfg.Region,
+			TraceSampleRate: cfg.Observability.Tracing.SampleRate,
+		})
+
+		if err != nil {
+			return fmt.Errorf("unable to init grafana: %w", err)
+		}
 	}
 
 	r := runner.New()
 	defer r.Recover()
+
+	r.DeferCtx(shutdownGrafana)
 
 	database, err := db.New(db.Config{
 		PrimaryDns: cfg.DatabaseURL,

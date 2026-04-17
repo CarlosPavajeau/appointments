@@ -22,9 +22,27 @@ type LoggingConfig struct {
 	SlowThreshold time.Duration
 }
 
+// TracingConfig controls OpenTelemetry tracing and metrics export.
+// SampleRate determines what fraction of traces are exported; the rest are dropped
+// to reduce storage costs and processing overhead.
+type TracingConfig struct {
+
+	// SampleRate is the probability (0.0–1.0) that a trace is sampled.
+	SampleRate float64
+}
+
+type Observability struct {
+	Tracing *TracingConfig
+	Logging *LoggingConfig
+}
+
 // Config holds all runtime configuration values for the API server,
 // populated from environment variables (or a .env file).
 type Config struct {
+	// InstanceID identifies this particular API server instance.
+	InstanceID string
+	// Region is the geographic region identifier (e.g. "us-east-1", "eu-west-1").
+	Region string
 	// DatabaseURL is the connection string for the PostgreSQL database (DATABASE_URL).
 	DatabaseURL string
 	// Port is the address the HTTP server listens on (PORT). Defaults to ":8080".
@@ -53,9 +71,8 @@ type Config struct {
 	JWKSEndpoint string
 	// JWTIssuer is the expected "iss" claim value for incoming JWTs (JWT_ISSUER).
 	// Optional — when empty the issuer claim is not validated.
-	JWTIssuer string
-	// Logging controls log sampling behavior.
-	Logging *LoggingConfig
+	JWTIssuer     string
+	Observability Observability
 }
 
 // LoadConfiguration reads configuration from a .env file if present, then falls back
@@ -84,6 +101,8 @@ func LoadConfiguration() Config {
 	}
 
 	return Config{
+		InstanceID:         mustGet("INSTANCE_ID"),
+		Region:             mustGet("REGION"),
 		DatabaseURL:        mustGet("DATABASE_URL"),
 		Port:               getOrDefault("PORT", ":8080"),
 		WhatsappBaseURL:    getOrDefault("WHATSAPP_BASE_URL", "https://graph.facebook.com"),
@@ -96,9 +115,14 @@ func LoadConfiguration() Config {
 		ResendFromEmail:    mustGet("RESEND_FROM_EMAIL"),
 		JWKSEndpoint:       mustGet("JWKS_ENDPOINT"),
 		JWTIssuer:          os.Getenv("JWT_ISSUER"), // optional
-		Logging: &LoggingConfig{
-			SampleRate:    sampleRate,
-			SlowThreshold: slowThreshold,
+		Observability: Observability{
+			Tracing: &TracingConfig{
+				SampleRate: sampleRate,
+			},
+			Logging: &LoggingConfig{
+				SampleRate:    sampleRate,
+				SlowThreshold: slowThreshold,
+			},
 		},
 	}
 }
