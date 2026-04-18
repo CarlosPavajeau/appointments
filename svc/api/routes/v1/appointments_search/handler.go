@@ -31,14 +31,24 @@ func (h *Handler) Method() string { return http.MethodGet }
 func (h *Handler) Path() string   { return "/v1/appointments" }
 
 func (h *Handler) Handle(c *gin.Context) {
-	dateStr := c.Query("date")
-	if dateStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date query parameter is required (YYYY-MM-DD)"})
+	fromStr := c.Query("from")
+	toStr := c.Query("to")
+	if fromStr == "" || toStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from and to query parameters are required (YYYY-MM-DD)"})
 		return
 	}
-	date, err := time.Parse("2006-01-02", dateStr)
+	fromDate, err := time.Parse("2006-01-02", fromStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date must be in YYYY-MM-DD format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from must be in YYYY-MM-DD format"})
+		return
+	}
+	toDate, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "to must be in YYYY-MM-DD format"})
+		return
+	}
+	if toDate.Before(fromDate) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "to must not be before from"})
 		return
 	}
 
@@ -74,8 +84,8 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	tenantID := jwt.TenantIDFromContext(c)
 
-	dayStart := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	dayEnd := dayStart.Add(24 * time.Hour)
+	dayStart := time.Date(fromDate.Year(), fromDate.Month(), fromDate.Day(), 0, 0, 0, 0, fromDate.Location())
+	dayEnd := time.Date(toDate.Year(), toDate.Month(), toDate.Day(), 0, 0, 0, 0, toDate.Location()).Add(24 * time.Hour)
 
 	args := []interface{}{tenantID, dayStart, dayEnd}
 	idx := 4
