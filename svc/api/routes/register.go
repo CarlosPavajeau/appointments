@@ -85,7 +85,7 @@ func Register(g *gin.Engine, svc *Services) {
 		resp, err := svc.Ratelimit.Ratelimit(c.Request.Context(), ratelimit.RatelimitRequest{
 			Name:       "api-requests-per-user",
 			Identifier: userID.(string),
-			Limit:      10,
+			Limit:      100,
 			Duration:   time.Minute,
 			Cost:       1,
 		})
