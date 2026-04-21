@@ -141,6 +141,20 @@ type Querier interface {
 	//  WHERE id = $1
 	//    AND resource_id = $2
 	DeleteWorkingHour(ctx context.Context, db DBTX, arg DeleteWorkingHourParams) error
+	//FindAllTenantFlowFields
+	//
+	//  SELECT id,
+	//         field_key,
+	//         field_type,
+	//         question,
+	//         is_required,
+	//         is_enabled,
+	//         sort_order,
+	//         created_at
+	//  FROM tenant_flow_fields
+	//  WHERE tenant_id = $1
+	//  ORDER BY sort_order, created_at
+	FindAllTenantFlowFields(ctx context.Context, db DBTX, tenantID uuid.UUID) ([]FindAllTenantFlowFieldsRow, error)
 	//FindAppointmentByID
 	//
 	//  SELECT id,
@@ -512,6 +526,19 @@ type Querier interface {
 	//    AND t.is_active = true
 	//  LIMIT 1
 	FindTenantByUserId(ctx context.Context, db DBTX, userID string) (Tenant, error)
+	//FindTenantEnabledFlowFields
+	//
+	//  SELECT id,
+	//         field_key,
+	//         field_type,
+	//         question,
+	//         is_required,
+	//         sort_order
+	//  FROM tenant_flow_fields
+	//  WHERE tenant_id = $1
+	//    AND is_enabled = true
+	//  ORDER BY sort_order, created_at
+	FindTenantEnabledFlowFields(ctx context.Context, db DBTX, tenantID uuid.UUID) ([]FindTenantEnabledFlowFieldsRow, error)
 	//FindTenantPendingActivations
 	//
 	//  SELECT wc.tenant_id,
