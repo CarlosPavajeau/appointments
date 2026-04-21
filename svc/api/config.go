@@ -44,6 +44,11 @@ type Observability struct {
 	Metrics *MetricsConfig
 }
 
+type WebhookConfig struct {
+	Workers   int
+	BufferCap int
+}
+
 // Config holds all runtime configuration values for the API server,
 // populated from environment variables (or a .env file).
 type Config struct {
@@ -79,6 +84,7 @@ type Config struct {
 	// Optional — when empty the issuer claim is not validated.
 	JWTIssuer     string
 	Observability Observability
+	Webhook       WebhookConfig
 }
 
 // LoadConfiguration reads configuration from a .env file if present, then falls back
@@ -115,6 +121,24 @@ func LoadConfiguration() Config {
 		}
 	}
 
+	var webhookWorkers int
+	if webhookWorkersStr := getOrDefault("WEBHOOK_WORKERS", "4"); webhookWorkersStr != "" {
+		var err error
+		webhookWorkers, err = strconv.Atoi(webhookWorkersStr)
+		if err != nil {
+			webhookWorkers = 4
+		}
+	}
+
+	var bufferCap int
+	if bufferCapStr := getOrDefault("BUFFER_CAP", "2000"); bufferCapStr != "" {
+		var err error
+		bufferCap, err = strconv.Atoi(bufferCapStr)
+		if err != nil {
+			bufferCap = 2_000
+		}
+	}
+
 	return Config{
 		InstanceID:         mustGet("INSTANCE_ID"),
 		Region:             mustGet("REGION"),
@@ -128,7 +152,7 @@ func LoadConfiguration() Config {
 		AdminEmail:         mustGet("ADMIN_EMAIL"),
 		ResendAPIKey:       mustGet("RESEND_API_KEY"),
 		ResendFromEmail:    mustGet("RESEND_FROM_EMAIL"),
-		JWTIssuer: os.Getenv("JWT_ISSUER"), // optional
+		JWTIssuer:          os.Getenv("JWT_ISSUER"), // optional
 		Observability: Observability{
 			Tracing: &TracingConfig{
 				SampleRate: sampleRate,
@@ -140,6 +164,10 @@ func LoadConfiguration() Config {
 			Metrics: &MetricsConfig{
 				PrometheusPort: prometheusPort,
 			},
+		},
+		Webhook: WebhookConfig{
+			Workers:   webhookWorkers,
+			BufferCap: bufferCap,
 		},
 	}
 }

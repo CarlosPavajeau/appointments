@@ -149,6 +149,8 @@ func Run(ctx context.Context, cfg Config) error {
 		DB:           database,
 		StateMachine: stateMachineSvc,
 		Crypto:       cryptoSvc,
+		Workers:      cfg.Webhook.Workers,
+		BufferCap:    cfg.Webhook.BufferCap,
 	})
 	r.Defer(webhookProcessorSvc.Close)
 

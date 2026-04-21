@@ -20,6 +20,8 @@ type Config struct {
 	DB           db.Database
 	StateMachine state_machine.StateMachineService
 	Crypto       *crypto.Service
+	Workers      int
+	BufferCap    int
 }
 
 type service struct {
@@ -36,11 +38,11 @@ func New(cfg Config) Service {
 		crypto:       cfg.Crypto,
 		msgBuffer: buffer.New[Request](buffer.Config{
 			Name:     "webhook_payloads",
-			Capacity: bufferCap,
+			Capacity: cfg.BufferCap,
 			Drop:     true,
 		}),
 	}
-	for range workers {
+	for range cfg.Workers {
 		go s.worker()
 	}
 	return s
