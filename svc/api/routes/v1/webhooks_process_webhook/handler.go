@@ -23,7 +23,8 @@ func (h *Handler) Path() string {
 func (h *Handler) Handle(c *gin.Context) {
 	var req webhook_processor.Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.Error("webhook: failed to parse payload: %v", err)
+		logger.Error("webhook: failed to parse payload",
+			"err", err)
 		c.Status(http.StatusOK)
 		return
 	}
