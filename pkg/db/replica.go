@@ -10,11 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-const (
-	statusSuccess = "success"
-	statusError   = "error"
-)
-
 // Replica wraps a standard SQL database connection and implements the gen.DBTX interface
 // to enable interaction with the generated database code.
 type Replica struct {
@@ -152,5 +147,6 @@ func (r *Replica) Begin(ctx context.Context) (DBTx, error) {
 
 	tracing.RecordErrorUnless(span, err, sql.ErrNoRows)
 
-	return tx, err
+	// Wrap the transaction with tracing
+	return WrapTxWithContext(tx, r.name+"_tx", ctx), nil
 }
