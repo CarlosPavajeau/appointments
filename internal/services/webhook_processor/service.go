@@ -12,11 +12,6 @@ import (
 	"wappiz/pkg/logger"
 )
 
-const (
-	workers   = 4
-	bufferCap = 2_000
-)
-
 type Config struct {
 	DB           db.Database
 	StateMachine state_machine.StateMachineService
