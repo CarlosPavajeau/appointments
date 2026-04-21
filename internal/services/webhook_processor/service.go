@@ -115,13 +115,6 @@ func (s *service) processPayload(req Request) {
 						"err", err)
 				}
 			}
-
-			for _, status := range change.Value.Statuses {
-				logger.Info("webhook: received status update",
-					"id", status.ID,
-					"status", status.Status,
-					"recipient_id", status.RecipientID)
-			}
 		}
 	}
 }
