@@ -1,4 +1,5 @@
 CREATE TYPE "appointment_status" AS ENUM ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show', 'check_in');
+CREATE TYPE "flow_field_type" AS ENUM ('predefined', 'custom');
 CREATE TYPE "whatsapp_activation_status" AS ENUM ('pending', 'in_progress', 'active', 'failed');
 CREATE TABLE "accounts"
 (
@@ -192,13 +193,14 @@ CREATE TABLE "tenant_flow_fields"
 (
     "id"          uuid PRIMARY KEY         DEFAULT gen_random_uuid(),
     "tenant_id"   uuid                                   NOT NULL,
-    "field_key"   varchar(50),
-    "field_type"  varchar(20),
+    "field_key"   varchar(50)                            NOT NULL,
+    "field_type"  "flow_field_type"                      NOT NULL,
     "question"    text,
     "is_required" boolean                  DEFAULT false NOT NULL,
     "is_enabled"  boolean                  DEFAULT true  NOT NULL,
     "sort_order"  integer                                NOT NULL,
-    "created_at"  timestamp with time zone DEFAULT now() NOT NULL
+    "created_at"  timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "uq_tenant_field_key" UNIQUE ("tenant_id", "field_key")
 );
 
 CREATE TABLE "tenant_users"
