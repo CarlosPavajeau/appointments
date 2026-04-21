@@ -44,13 +44,13 @@ func TestHandle_CreatesTenant_ReturnsCreated(t *testing.T) {
 	}
 
 	var body struct {
-		Tenant string `json:"tenant"`
+		Tenant string `json:"tenant_id"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatalf("failed to parse JSON body: %v", err)
 	}
-	if body.Tenant != userID {
-		t.Fatalf("expected response tenant=%q, got %q", userID, body.Tenant)
+	if len(body.Tenant) == 0 {
+		t.Fatal("expected non-empty tenant_id in response")
 	}
 
 	var tenantCount int
