@@ -23,6 +23,7 @@ import (
 	"wappiz/svc/api/routes/v1/onboarding_step_barber"
 	"wappiz/svc/api/routes/v1/onboarding_step_services"
 	"wappiz/svc/api/routes/v1/onboarding_step_whatsapp"
+	"wappiz/svc/api/routes/v1/plans_list_active"
 	"wappiz/svc/api/routes/v1/resources_assign_services"
 	"wappiz/svc/api/routes/v1/resources_create"
 	"wappiz/svc/api/routes/v1/resources_create_override"
@@ -153,6 +154,9 @@ func Register(g *gin.Engine, svc *Services) {
 	RegisterRoute(auth, &resources_delete_override.Handler{DB: svc.Database})
 	RegisterRoute(auth, &resources_assign_services.Handler{DB: svc.Database})
 	RegisterRoute(auth, &resources_get_services.Handler{DB: svc.Database})
+
+	// v1/plans
+	RegisterRoute(auth, &plans_list_active.Handler{DB: svc.Database, Environment: "sandbox"})
 
 	// v1/admin
 	admin := auth.Group("/", func(c *gin.Context) {

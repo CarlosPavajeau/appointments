@@ -966,6 +966,19 @@ type Querier interface {
 	//  VALUES ($1, $2, 'admin')
 	//  ON CONFLICT (user_id, tenant_id) DO NOTHING
 	LinkTenantUser(ctx context.Context, db DBTX, arg LinkTenantUserParams) error
+	//ListActivePlans
+	//
+	//  SELECT id,
+	//         external_id,
+	//         name,
+	//         description,
+	//         price,
+	//         currency,
+	//         "interval"
+	//  FROM plans
+	//  WHERE is_active = true
+	//    AND environment = $1
+	ListActivePlans(ctx context.Context, db DBTX, environment string) ([]ListActivePlansRow, error)
 	//Mark24hAppointmentReminderSent
 	//
 	//  UPDATE appointments
