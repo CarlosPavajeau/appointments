@@ -262,6 +262,22 @@ type OnboardingProgress struct {
 	UpdatedAt   time.Time    `db:"updated_at"`
 }
 
+type Plan struct {
+	ID              uuid.UUID       `db:"id"`
+	ExternalID      string          `db:"external_id"`
+	ExternalPriceID sql.NullString  `db:"external_price_id"`
+	Name            string          `db:"name"`
+	Description     sql.NullString  `db:"description"`
+	Price           int32           `db:"price"`
+	Currency        string          `db:"currency"`
+	Interval        sql.NullString  `db:"interval"`
+	Features        json.RawMessage `db:"features"`
+	IsActive        bool            `db:"is_active"`
+	Environment     string          `db:"environment"`
+	CreatedAt       time.Time       `db:"created_at"`
+	UpdatedAt       time.Time       `db:"updated_at"`
+}
+
 type Resource struct {
 	ID        uuid.UUID      `db:"id"`
 	TenantID  uuid.UUID      `db:"tenant_id"`
@@ -312,6 +328,33 @@ type Session struct {
 	UpdatedAt      time.Time      `db:"updated_at"`
 	UserAgent      sql.NullString `db:"user_agent"`
 	UserID         string         `db:"user_id"`
+}
+
+type Subscription struct {
+	ID                 uuid.UUID    `db:"id"`
+	TenantID           uuid.UUID    `db:"tenant_id"`
+	PlanID             uuid.UUID    `db:"plan_id"`
+	ExternalID         string       `db:"external_id"`
+	ExternalCustomerID string       `db:"external_customer_id"`
+	Status             string       `db:"status"`
+	CurrentPeriodStart sql.NullTime `db:"current_period_start"`
+	CurrentPeriodEnd   sql.NullTime `db:"current_period_end"`
+	CancelAtPeriodEnd  bool         `db:"cancel_at_period_end"`
+	CanceledAt         sql.NullTime `db:"canceled_at"`
+	Environment        string       `db:"environment"`
+	CreatedAt          time.Time    `db:"created_at"`
+	UpdatedAt          time.Time    `db:"updated_at"`
+}
+
+type SubscriptionOrder struct {
+	ID             uuid.UUID `db:"id"`
+	SubscriptionID uuid.UUID `db:"subscription_id"`
+	ExternalID     string    `db:"external_id"`
+	Amount         int32     `db:"amount"`
+	Currency       string    `db:"currency"`
+	Status         string    `db:"status"`
+	Environment    string    `db:"environment"`
+	CreatedAt      time.Time `db:"created_at"`
 }
 
 type Tenant struct {
