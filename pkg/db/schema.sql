@@ -130,6 +130,23 @@ CREATE TABLE "onboarding_progress"
     "updated_at"   timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE "plans"
+(
+    "id"                uuid PRIMARY KEY         DEFAULT gen_random_uuid(),
+    "external_id"       varchar(100)                                  NOT NULL UNIQUE,
+    "external_price_id" varchar(100),
+    "name"              varchar(100)                                  NOT NULL,
+    "description"       text,
+    "price"             integer                  DEFAULT 0            NOT NULL,
+    "currency"          varchar(3)               DEFAULT 'COP'        NOT NULL,
+    "interval"          varchar(20),
+    "features"          jsonb                    DEFAULT '{}'         NOT NULL,
+    "is_active"         boolean                  DEFAULT true         NOT NULL,
+    "environment"       varchar(20)              DEFAULT 'production' NOT NULL,
+    "created_at"        timestamp with time zone DEFAULT now()        NOT NULL,
+    "updated_at"        timestamp with time zone DEFAULT now()        NOT NULL
+);
+
 CREATE TABLE "resource_services"
 (
     "resource_id" uuid,
@@ -187,6 +204,35 @@ CREATE TABLE "sessions"
     "updated_at"      timestamp               NOT NULL,
     "user_agent"      text,
     "user_id"         text                    NOT NULL
+);
+
+CREATE TABLE "subscription_orders"
+(
+    "id"              uuid PRIMARY KEY         DEFAULT gen_random_uuid(),
+    "subscription_id" uuid                                          NOT NULL,
+    "external_id"     varchar(100)                                  NOT NULL UNIQUE,
+    "amount"          integer                                       NOT NULL,
+    "currency"        varchar(3)               DEFAULT 'COP'        NOT NULL,
+    "status"          varchar(20)                                   NOT NULL,
+    "environment"     varchar(20)              DEFAULT 'production' NOT NULL,
+    "created_at"      timestamp with time zone DEFAULT now()        NOT NULL
+);
+
+CREATE TABLE "subscriptions"
+(
+    "id"                   uuid PRIMARY KEY         DEFAULT gen_random_uuid(),
+    "tenant_id"            uuid                                          NOT NULL,
+    "plan_id"              uuid                                          NOT NULL,
+    "external_id"          varchar(100)                                  NOT NULL UNIQUE,
+    "external_customer_id" varchar(100)                                  NOT NULL,
+    "status"               varchar(20)              DEFAULT 'pending'    NOT NULL,
+    "current_period_start" timestamp with time zone,
+    "current_period_end"   timestamp with time zone,
+    "cancel_at_period_end" boolean                  DEFAULT false        NOT NULL,
+    "canceled_at"          timestamp with time zone,
+    "environment"          varchar(20)              DEFAULT 'production' NOT NULL,
+    "created_at"           timestamp with time zone DEFAULT now()        NOT NULL,
+    "updated_at"           timestamp with time zone DEFAULT now()        NOT NULL
 );
 
 CREATE TABLE "tenant_flow_fields"
@@ -302,8 +348,12 @@ CREATE INDEX "no_customer_overlap" ON "appointments" USING gist ("tenant_id", "c
 CREATE INDEX "no_overlap" ON "appointments" USING gist ("resource_id", tstzrange(starts_at, ends_at)) WHERE (
     status <> ALL (ARRAY ['cancelled'::appointment_status, 'no_show'::appointment_status]));
 CREATE INDEX "idx_sessions_active_lookup" ON "conversation_sessions" ("tenant_id", "customer_id", "expires_at");
+CREATE UNIQUE INDEX "uq_plans_external_id_environment" ON "plans" ("external_id", "environment");
 CREATE INDEX "idx_services_tenant_id" ON "services" ("tenant_id");
 CREATE INDEX "session_userId_idx" ON "sessions" ("user_id");
+CREATE UNIQUE INDEX "uq_subscription_orders_external_id_environment" ON "subscription_orders" ("external_id", "environment");
+CREATE UNIQUE INDEX "uq_tenant_active_subscription" ON "subscriptions" ("tenant_id", "environment") WHERE status = 'active';
+CREATE INDEX "idx_subscriptions_external_id" ON "subscriptions" ("external_id", "environment");
 CREATE INDEX "verification_identifier_idx" ON "verifications" ("identifier");
 CREATE INDEX "idx_working_hours_resource_id" ON "working_hours" ("resource_id");
 ALTER TABLE "accounts"
@@ -354,6 +404,12 @@ ALTER TABLE "services"
     ADD CONSTRAINT "services_tenant_id_tenants_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants" ("id") ON DELETE CASCADE;
 ALTER TABLE "sessions"
     ADD CONSTRAINT "sessions_user_id_users_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE;
+ALTER TABLE "subscription_orders"
+    ADD CONSTRAINT "subscription_orders_subscription_id_subscriptions_id_fkey" FOREIGN KEY ("subscription_id") REFERENCES "subscriptions" ("id");
+ALTER TABLE "subscriptions"
+    ADD CONSTRAINT "subscriptions_tenant_id_tenants_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants" ("id");
+ALTER TABLE "subscriptions"
+    ADD CONSTRAINT "subscriptions_plan_id_plans_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "plans" ("id");
 ALTER TABLE "tenant_flow_fields"
     ADD CONSTRAINT "tenant_flow_fields_tenant_id_tenants_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants" ("id") ON DELETE CASCADE;
 ALTER TABLE "tenant_users"
