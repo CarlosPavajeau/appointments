@@ -170,6 +170,19 @@ type Querier interface {
 	//  WHERE id = $1
 	//    AND resource_id = $2
 	DeleteWorkingHour(ctx context.Context, db DBTX, arg DeleteWorkingHourParams) error
+	//FindActivePlanByTenant
+	//
+	//  SELECT p.id,
+	//         p.external_id,
+	//         p.environment,
+	//         p.features
+	//  FROM subscriptions ts
+	//           JOIN plans p ON p.id = ts.plan_id
+	//  WHERE ts.tenant_id = $1
+	//    AND ts.status = 'active'
+	//    AND ts.environment = $2
+	//  LIMIT 1
+	FindActivePlanByTenant(ctx context.Context, db DBTX, arg FindActivePlanByTenantParams) (FindActivePlanByTenantRow, error)
 	//FindAllTenantFlowFields
 	//
 	//  SELECT id,
