@@ -41,6 +41,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			if !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("find active plan by tenant: %w", err)
 			} else if tenant.AppointmentsThisMonth >= freePlanLimit { // If no active plan is found, we assume the tenant is on the free plan and enforce the limit.
+				// TODO: Send limit reached notification
 				return apperrors.ErrPlanLimitReached
 			}
 		}
@@ -51,6 +52,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 		}
 
 		if features.MaxAppointmentsPerMonth != nil && tenant.AppointmentsThisMonth >= int32(*features.MaxAppointmentsPerMonth) { // No limit if null
+			// TODO: Send limit reached notification
 			return apperrors.ErrPlanLimitReached
 		}
 
