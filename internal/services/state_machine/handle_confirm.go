@@ -45,7 +45,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			}
 		}
 
-		features, err := db.UnmarshalNullableJSONTo[db.PlanFeatures](plan.Features)
+		features, err := db.UnmarshalNullableJSONTo[db.PlanFeatures]([]byte(plan.Features))
 		if err != nil {
 			return err
 		}
