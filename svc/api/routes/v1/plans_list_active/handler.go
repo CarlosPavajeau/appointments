@@ -10,7 +10,7 @@ import (
 
 type Response struct {
 	ID          uuid.UUID `json:"id"`
-	ExternalID  string    `json:"external_id"`
+	ExternalID  string    `json:"externalId"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Price       int32     `json:"price"`
