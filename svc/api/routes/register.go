@@ -8,6 +8,7 @@ import (
 	"wappiz/pkg/jwt"
 	"wappiz/pkg/logger"
 	"wappiz/svc/api/middleware"
+	"wappiz/svc/api/openapi"
 	"wappiz/svc/api/routes/v1/admin_activate_tenant"
 	"wappiz/svc/api/routes/v1/admin_find_pending_activations"
 	"wappiz/svc/api/routes/v1/admin_reject_tenant"
@@ -80,7 +81,17 @@ func Register(g *gin.Engine, svc *Services) {
 	rate := func(c *gin.Context) {
 		userID, ok := c.Get("user_id")
 		if !ok {
-			c.AbortWithStatus(http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, openapi.UnauthorizedErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "Unauthorized",
+					Type:   "unauthorized",
+					Detail: "No estás authorizado. Por favor inicia sesión para continuar.",
+					Status: http.StatusUnauthorized,
+				},
+			})
 			return
 		}
 
@@ -93,16 +104,37 @@ func Register(g *gin.Engine, svc *Services) {
 		})
 
 		if err != nil {
-			c.AbortWithStatus(http.StatusInternalServerError)
-			logger.Warn("[api] rate limit check failed",
-				"error", err)
+			logger.Warn("[api] rate limit check failed", "error", err)
+
+			c.AbortWithStatusJSON(http.StatusInternalServerError, openapi.InternalServerErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "Internal Server Error",
+					Type:   "internal_server_error",
+					Detail: err.Error(),
+					Status: http.StatusInternalServerError,
+				},
+			})
+
 			return
 		}
 
 		if !resp.Success {
 			c.Header("X-Rate-Limit-Limit", fmt.Sprintf("%d", resp.Limit))
 			c.Header("X-Rate-Limit-Reset", fmt.Sprintf("%d", resp.Reset.Unix()))
-			c.AbortWithStatus(http.StatusTooManyRequests)
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, openapi.TooManyRequestsErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "Too many requests",
+					Type:   "too_many_requests",
+					Detail: "Has excedido el límite de solicitudes. Por favor espera un momento antes de intentar nuevamente.",
+					Status: http.StatusTooManyRequests,
+				},
+			})
 			return
 		}
 
