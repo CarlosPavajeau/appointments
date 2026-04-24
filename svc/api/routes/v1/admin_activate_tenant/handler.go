@@ -8,8 +8,10 @@ import (
 	"html"
 	"net/http"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/crypto"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/mailer"
 
@@ -46,75 +48,86 @@ func (h *Handler) Path() string {
 func (h *Handler) Handle(c *gin.Context) {
 	tenantID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant id"})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid tenant id"), fault.Public("Id del tenant inválido"),
+			),
+		)
 		return
 	}
 
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid json body"), fault.Public("Campos inválidos en la solicitud"),
+			),
+		)
 		return
 	}
 
 	ctx := c.Request.Context()
 
-	tx, err := h.DB.Primary().Begin(ctx)
-	if err != nil {
-		logger.Warn("[admin] begin transaction for activation", "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to activate tenant"})
-		return
+	type Result struct {
+		TenantName             string
+		ActivationContactEmail string
 	}
-	defer tx.Rollback()
 
-	tenant, err := db.Query.FindTenantByID(ctx, tx, tenantID)
+	result, err := db.TxWithResult(ctx, h.DB.Primary(), func(ctx context.Context, txx db.DBTX) (*Result, error) {
+		tenant, err := db.Query.FindTenantByID(ctx, txx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+
+		accessToken, err := h.Crypto.Encrypt(req.AccessToken)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := db.Query.ActivateTenantWhatsappConfig(ctx, txx, db.ActivateTenantWhatsappConfigParams{
+			WabaID:             sql.NullString{String: req.WABAID, Valid: req.WABAID != ""},
+			PhoneNumberID:      sql.NullString{String: req.PhoneNumberID, Valid: req.PhoneNumberID != ""},
+			DisplayPhoneNumber: sql.NullString{String: req.DisplayPhoneNumber, Valid: req.DisplayPhoneNumber != ""},
+			AccessToken:        sql.NullString{String: accessToken, Valid: accessToken != ""},
+			TenantID:           tenantID,
+		}); err != nil {
+			return nil, err
+		}
+
+		waConfig, err := db.Query.FindTenantWhatsappConfig(ctx, txx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !waConfig.ActivationContactEmail.Valid {
+			return nil, nil
+		}
+
+		return &Result{
+			TenantName:             tenant.Name,
+			ActivationContactEmail: waConfig.ActivationContactEmail.String,
+		}, nil
+	})
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+			c.Error(
+				fault.Wrap(err,
+					fault.Code(codes.ErrorsNotFound),
+					fault.Internal("Tenant not found"), fault.Public("Tenant no encontrado"),
+				),
+			)
 			return
 		}
-		logger.Warn("[admin] find tenant for activation", "tenant_id", tenantID, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to activate tenant"})
+
+		c.Error(fault.Wrap(err, fault.Internal("failed to activate tenant")))
 		return
 	}
 
-	accessToken, err := h.Crypto.Encrypt(req.AccessToken)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := db.Query.ActivateTenantWhatsappConfig(ctx, tx, db.ActivateTenantWhatsappConfigParams{
-		WabaID:             sql.NullString{String: req.WABAID, Valid: req.WABAID != ""},
-		PhoneNumberID:      sql.NullString{String: req.PhoneNumberID, Valid: req.PhoneNumberID != ""},
-		DisplayPhoneNumber: sql.NullString{String: req.DisplayPhoneNumber, Valid: req.DisplayPhoneNumber != ""},
-		AccessToken:        sql.NullString{String: accessToken, Valid: accessToken != ""},
-		TenantID:           tenantID,
-	}); err != nil {
-		logger.Warn("[admin] activate whatsapp config", "tenant_id", tenantID, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to activate tenant"})
-		return
-	}
-
-	waConfig, err := db.Query.FindTenantWhatsappConfig(ctx, tx, tenantID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			logger.Warn("[admin] whatsapp config missing after activation", "tenant_id", tenantID)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "whatsapp config not found after activation"})
-			return
-		}
-		logger.Warn("[admin] fetch whatsapp config after activation", "tenant_id", tenantID, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load whatsapp config"})
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		logger.Warn("[admin] commit activation transaction", "tenant_id", tenantID, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to activate tenant"})
-		return
-	}
-
-	if waConfig.ActivationContactEmail.Valid {
-		scheduleActivationEmail(h.Mailer, tenantID, waConfig.ActivationContactEmail.String, tenant.Name, req.DisplayPhoneNumber)
+	if result != nil {
+		scheduleActivationEmail(h.Mailer, tenantID, result.ActivationContactEmail, result.TenantName, req.DisplayPhoneNumber)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "tenant activated"})
