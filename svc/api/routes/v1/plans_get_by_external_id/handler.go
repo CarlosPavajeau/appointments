@@ -2,7 +2,9 @@ package plans_get_by_external_id
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,22 +25,20 @@ type Handler struct {
 	Environment string
 }
 
-func (h *Handler) Method() string {
-	return http.MethodGet
-}
-
-func (h *Handler) Path() string {
-	return "/v1/plans/by-external-id/:externalId"
-}
+func (h *Handler) Method() string { return http.MethodGet }
+func (h *Handler) Path() string   { return "/v1/plans/by-external-id/:externalId" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	plan, err := db.Query.FindPlanByExternalId(c.Request.Context(), h.DB.Primary(), db.FindPlanByExternalIdParams{
 		ExternalID:  c.Param("externalId"),
 		Environment: h.Environment,
 	})
-
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("plan not found by external id"),
+			fault.Public("El plan no existe"),
+		))
 		return
 	}
 

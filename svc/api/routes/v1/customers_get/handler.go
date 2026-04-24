@@ -2,7 +2,9 @@ package customers_get
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +29,11 @@ func (h *Handler) Path() string   { return "/v1/customers/:id" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid customer id"),
+			fault.Public("Id del cliente inválido"),
+		))
 		return
 	}
 
@@ -35,11 +41,19 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	customer, err := db.Query.FindCustomerByID(c.Request.Context(), h.DB.Primary(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("customer not found"),
+			fault.Public("El cliente no existe"),
+		))
 		return
 	}
 	if customer.TenantID != tenantID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "customer not found"})
+		c.Error(fault.New("customer not found",
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("customer belongs to a different tenant"),
+			fault.Public("El cliente no existe"),
+		))
 		return
 	}
 

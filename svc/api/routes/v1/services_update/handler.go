@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -23,24 +25,27 @@ type Handler struct {
 	DB db.Database
 }
 
-func (h *Handler) Method() string {
-	return http.MethodPut
-}
-
-func (h *Handler) Path() string {
-	return "/v1/services/:id"
-}
+func (h *Handler) Method() string { return http.MethodPut }
+func (h *Handler) Path() string   { return "/v1/services/:id" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid service id"),
+			fault.Public("Id del servicio inválido"),
+		))
 		return
 	}
 
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
@@ -56,7 +61,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		ID:              id,
 		TenantID:        tenantID,
 	}); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to update service")))
 		return
 	}
 

@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 	"wappiz/pkg/whatsapp"
 
@@ -41,13 +43,21 @@ func (h *Handler) Path() string   { return "/v1/appointments/:id/status" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment ID"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid appointment id"),
+			fault.Public("Id de cita inválido"),
+		))
 		return
 	}
 
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil || req.Status == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "status is required"})
+		c.Error(fault.New("missing status field",
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("status field is required"),
+			fault.Public("El campo 'status' es requerido"),
+		))
 		return
 	}
 
@@ -61,7 +71,11 @@ func (h *Handler) Handle(c *gin.Context) {
 		TenantID: tenantID,
 	})
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "appointment not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("appointment not found"),
+			fault.Public("La cita no existe"),
+		))
 		return
 	}
 
@@ -74,13 +88,17 @@ func (h *Handler) Handle(c *gin.Context) {
 		}
 	}
 	if !validTransition {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid status transition"})
+		c.Error(fault.New("invalid status transition",
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal(fmt.Sprintf("invalid transition from %s to %s", appt.Status, req.Status)),
+			fault.Public("La transición de estado no es válida"),
+		))
 		return
 	}
 
 	tx, err := h.DB.Primary().Begin(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to begin transaction")))
 		return
 	}
 	defer tx.Rollback()
@@ -98,7 +116,7 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 
 	if err := db.Query.UpdateAppointment(c.Request.Context(), tx, updateParams); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to update appointment status")))
 		return
 	}
 
@@ -111,12 +129,12 @@ func (h *Handler) Handle(c *gin.Context) {
 		ChangedByRole: sql.NullString{String: role, Valid: role != ""},
 		Reason:        sql.NullString{String: req.Reason, Valid: req.Reason != ""},
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to insert appointment status history")))
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to commit transaction")))
 		return
 	}
 

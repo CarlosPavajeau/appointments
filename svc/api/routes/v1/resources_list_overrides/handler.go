@@ -3,9 +3,10 @@ package resources_list_overrides
 import (
 	"net/http"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
-	"wappiz/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,7 +31,11 @@ func (h *Handler) Path() string   { return "/v1/resources/:id/overrides" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid resource id"),
+			fault.Public("Id del recurso inválido"),
+		))
 		return
 	}
 
@@ -38,11 +43,19 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	r, err := db.Query.FindResourceById(c.Request.Context(), h.DB.Primary(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource not found"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 	if r.TenantID != tenantID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.New("resource not found",
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource belongs to a different tenant"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 
@@ -66,9 +79,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		Date_2:     to,
 	})
 	if err != nil {
-		logger.Error("failed to find overrides",
-			"err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch overrides"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch schedule overrides")))
 		return
 	}
 

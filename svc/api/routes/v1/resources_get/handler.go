@@ -2,7 +2,9 @@ package resources_get
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +41,11 @@ func (h *Handler) Path() string   { return "/v1/resources/:id" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid resource id"),
+			fault.Public("Id del recurso inválido"),
+		))
 		return
 	}
 
@@ -47,17 +53,25 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	r, err := db.Query.FindResourceById(c.Request.Context(), h.DB.Primary(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource not found"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 	if r.TenantID != tenantID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.New("resource not found",
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource belongs to a different tenant"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 
 	whs, err := db.Query.FindResourceWorkingHours(c.Request.Context(), h.DB.Primary(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch working hours"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch working hours")))
 		return
 	}
 

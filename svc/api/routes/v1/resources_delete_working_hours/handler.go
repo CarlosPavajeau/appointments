@@ -2,7 +2,9 @@ package resources_delete_working_hours
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -19,12 +21,20 @@ func (h *Handler) Path() string   { return "/v1/resources/:id/working-hours/:whi
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid resource id"),
+			fault.Public("Id del recurso inválido"),
+		))
 		return
 	}
 	whID, err := uuid.Parse(c.Param("whid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid working hours id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid working hours id"),
+			fault.Public("Id del horario inválido"),
+		))
 		return
 	}
 
@@ -32,11 +42,19 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	r, err := db.Query.FindResourceById(c.Request.Context(), h.DB.Primary(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource not found"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 	if r.TenantID != tenantID {
-		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		c.Error(fault.New("resource not found",
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("resource belongs to a different tenant"),
+			fault.Public("El recurso no existe"),
+		))
 		return
 	}
 
@@ -44,7 +62,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		ID:         whID,
 		ResourceID: id,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete working hours"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to delete working hours")))
 		return
 	}
 

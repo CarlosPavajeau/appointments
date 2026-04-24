@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -23,18 +25,17 @@ type Handler struct {
 	DB db.Database
 }
 
-func (h *Handler) Method() string {
-	return http.MethodPost
-}
-
-func (h *Handler) Path() string {
-	return "/v1/services"
-}
+func (h *Handler) Method() string { return http.MethodPost }
+func (h *Handler) Path() string   { return "/v1/services" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
@@ -50,7 +51,8 @@ func (h *Handler) Handle(c *gin.Context) {
 		Price:           fmt.Sprint(req.Price),
 		SortOrder:       1,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to create service")))
+		return
 	}
 
 	c.Status(http.StatusCreated)

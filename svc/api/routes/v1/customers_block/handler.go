@@ -2,7 +2,9 @@ package customers_block
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +21,11 @@ func (h *Handler) Path() string   { return "/v1/customers/:id/block" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer id"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid customer id"),
+			fault.Public("Id del cliente inválido"),
+		))
 		return
 	}
 
@@ -29,7 +35,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		ID:       id,
 		TenantID: tenantID,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to block customer"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to block customer")))
 		return
 	}
 

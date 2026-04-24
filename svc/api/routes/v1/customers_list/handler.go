@@ -3,6 +3,7 @@ package customers_list
 import (
 	"net/http"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,7 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	customers, err := db.Query.FindCustomersByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch customers"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch customers")))
 		return
 	}
 

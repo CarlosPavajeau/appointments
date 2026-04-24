@@ -3,7 +3,9 @@ package tenants_update
 import (
 	"encoding/json"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -24,32 +26,35 @@ type Handler struct {
 	DB db.Database
 }
 
-func (h *Handler) Method() string {
-	return http.MethodPut
-}
-
-func (h *Handler) Path() string {
-	return "/v1/tenants/settings"
-}
+func (h *Handler) Method() string { return http.MethodPut }
+func (h *Handler) Path() string   { return "/v1/tenants/settings" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
 	tenantID := jwt.TenantIDFromContext(c)
+
 	tenant, err := db.Query.FindTenantByID(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("tenant not found"),
+			fault.Public("La cuenta no fue encontrada"),
+		))
 		return
 	}
 
 	newSettings, err := json.Marshal(req)
-
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to serialize settings")))
 		return
 	}
 
@@ -59,7 +64,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		Settings: newSettings,
 		ID:       tenantID,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to update tenant settings")))
 		return
 	}
 

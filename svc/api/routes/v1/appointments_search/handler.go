@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -34,21 +36,38 @@ func (h *Handler) Handle(c *gin.Context) {
 	fromStr := c.Query("from")
 	toStr := c.Query("to")
 	if fromStr == "" || toStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "from and to query parameters are required (YYYY-MM-DD)"})
+		c.Error(fault.New("missing required query params",
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("from and to query params are required"),
+			fault.Public("Los parámetros 'from' y 'to' son requeridos (YYYY-MM-DD)"),
+		))
 		return
 	}
+
 	fromDate, err := time.Parse("2006-01-02", fromStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "from must be in YYYY-MM-DD format"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid from date format"),
+			fault.Public("El parámetro 'from' debe tener formato YYYY-MM-DD"),
+		))
 		return
 	}
 	toDate, err := time.Parse("2006-01-02", toStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "to must be in YYYY-MM-DD format"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid to date format"),
+			fault.Public("El parámetro 'to' debe tener formato YYYY-MM-DD"),
+		))
 		return
 	}
 	if toDate.Before(fromDate) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "to must not be before from"})
+		c.Error(fault.New("invalid date range",
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("to must not be before from"),
+			fault.Public("La fecha 'to' no puede ser anterior a 'from'"),
+		))
 		return
 	}
 
@@ -59,7 +78,11 @@ func (h *Handler) Handle(c *gin.Context) {
 	for _, raw := range c.QueryArray("resource") {
 		id, err := uuid.Parse(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid resource ID: " + raw})
+			c.Error(fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid resource ID: "+raw),
+				fault.Public("ID de recurso inválido"),
+			))
 			return
 		}
 		resourceIDs = append(resourceIDs, id)
@@ -67,7 +90,11 @@ func (h *Handler) Handle(c *gin.Context) {
 	for _, raw := range c.QueryArray("service") {
 		id, err := uuid.Parse(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service ID: " + raw})
+			c.Error(fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid service ID: "+raw),
+				fault.Public("ID de servicio inválido"),
+			))
 			return
 		}
 		serviceIDs = append(serviceIDs, id)
@@ -75,7 +102,11 @@ func (h *Handler) Handle(c *gin.Context) {
 	if raw := c.Query("customer"); raw != "" {
 		id, err := uuid.Parse(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid customer ID: " + raw})
+			c.Error(fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid customer ID: "+raw),
+				fault.Public("ID de cliente inválido"),
+			))
 			return
 		}
 		customerID = &id
@@ -150,7 +181,7 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	rows, err := h.DB.Primary().QueryContext(c.Request.Context(), query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch appointments"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch appointments")))
 		return
 	}
 	defer rows.Close()
@@ -163,14 +194,14 @@ func (h *Handler) Handle(c *gin.Context) {
 			&r.ID, &r.StartsAt, &r.EndsAt, &r.Status, &priceAtBooking,
 			&r.ResourceName, &r.ServiceName, &r.CustomerName,
 		); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch appointments"})
+			c.Error(fault.Wrap(err, fault.Internal("failed to scan appointment row")))
 			return
 		}
 		r.PriceAtBooking = priceAtBooking
 		result = append(result, r)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch appointments"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to iterate appointment rows")))
 		return
 	}
 	if result == nil {

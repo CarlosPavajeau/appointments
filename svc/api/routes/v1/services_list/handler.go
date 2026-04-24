@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -25,19 +26,15 @@ type Handler struct {
 	DB db.Database
 }
 
-func (h *Handler) Method() string {
-	return http.MethodGet
-}
-
-func (h *Handler) Path() string {
-	return "/v1/services"
-}
+func (h *Handler) Method() string { return http.MethodGet }
+func (h *Handler) Path() string   { return "/v1/services" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	tenantID := jwt.TenantIDFromContext(c)
+
 	services, err := db.Query.FindServicesByTenantID(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch services")))
 		return
 	}
 

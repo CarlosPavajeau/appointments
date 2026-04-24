@@ -3,7 +3,9 @@ package tenants_get_current
 import (
 	"encoding/json"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -23,25 +25,25 @@ type Handler struct {
 	DB db.Database
 }
 
-func (h *Handler) Method() string {
-	return http.MethodGet
-}
-
-func (h *Handler) Path() string {
-	return "/v1/tenants/me"
-}
+func (h *Handler) Method() string { return http.MethodGet }
+func (h *Handler) Path() string   { return "/v1/tenants/me" }
 
 func (h *Handler) Handle(c *gin.Context) {
 	tenantID := jwt.TenantIDFromContext(c)
+
 	tenant, err := db.Query.FindTenantByID(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsNotFound),
+			fault.Internal("tenant not found"),
+			fault.Public("La cuenta no fue encontrada"),
+		))
 		return
 	}
 
 	var settings db.TenantSettings
 	if err := json.Unmarshal(tenant.Settings, &settings); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to parse tenant settings")))
 		return
 	}
 

@@ -3,7 +3,9 @@ package onboarding_step_services
 import (
 	"fmt"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -36,7 +38,11 @@ func (h *Handler) Path() string   { return "/v1/onboarding/step/3" }
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
@@ -44,21 +50,29 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	progress, err := db.Query.FindOnboardingProgressByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch onboarding progress")))
 		return
 	}
 	if progress.CurrentStep < stepServices {
-		c.JSON(http.StatusForbidden, gin.H{"error": "step not available yet"})
+		c.Error(fault.New("onboarding step not available",
+			fault.Code(codes.ErrorsForbidden),
+			fault.Internal("step not available yet"),
+			fault.Public("Este paso aún no está disponible"),
+		))
 		return
 	}
 
 	resources, err := db.Query.FindResourcesByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch resources")))
 		return
 	}
 	if len(resources) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "complete the barber step first"})
+		c.Error(fault.New("no resources found",
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("no resources found for tenant"),
+			fault.Public("Primero debes completar el paso del barbero"),
+		))
 		return
 	}
 
@@ -75,7 +89,7 @@ func (h *Handler) Handle(c *gin.Context) {
 			Price:           fmt.Sprintf("%g", item.Price),
 			SortOrder:       int32(i + 1),
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			c.Error(fault.Wrap(err, fault.Internal("failed to create service")))
 			return
 		}
 
@@ -83,7 +97,7 @@ func (h *Handler) Handle(c *gin.Context) {
 			ResourceID: firstResourceID,
 			ServiceID:  serviceID,
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			c.Error(fault.Wrap(err, fault.Internal("failed to assign service to resource")))
 			return
 		}
 	}
@@ -92,7 +106,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		TenantID:    tenantID,
 		CurrentStep: stepWhatsApp,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to advance onboarding step")))
 		return
 	}
 

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 	"wappiz/pkg/mailer"
 
@@ -33,7 +35,11 @@ func (h *Handler) Path() string   { return "/v1/onboarding/step/4" }
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
@@ -41,17 +47,21 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	progress, err := db.Query.FindOnboardingProgressByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch onboarding progress")))
 		return
 	}
 	if progress.CurrentStep < stepWhatsApp {
-		c.JSON(http.StatusForbidden, gin.H{"error": "step not available yet"})
+		c.Error(fault.New("onboarding step not available",
+			fault.Code(codes.ErrorsForbidden),
+			fault.Internal("step not available yet"),
+			fault.Public("Este paso aún no está disponible"),
+		))
 		return
 	}
 
 	tenant, err := db.Query.FindTenantByID(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch tenant")))
 		return
 	}
 
@@ -61,12 +71,12 @@ func (h *Handler) Handle(c *gin.Context) {
 		ActivationContactEmail: sql.NullString{String: req.ContactEmail, Valid: true},
 		ActivationNotes:        sql.NullString{String: req.Notes, Valid: req.Notes != ""},
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to save whatsapp config")))
 		return
 	}
 
 	if err := db.Query.CompleteOnboardingProgress(c.Request.Context(), h.DB.Primary(), tenantID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to complete onboarding")))
 		return
 	}
 

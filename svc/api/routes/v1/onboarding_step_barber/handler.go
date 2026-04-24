@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +42,11 @@ func parseTime(s string) (time.Time, error) {
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid request body"),
+			fault.Public("Los datos enviados son inválidos"),
+		))
 		return
 	}
 
@@ -48,22 +54,34 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	progress, err := db.Query.FindOnboardingProgressByTenant(c.Request.Context(), h.DB.Primary(), tenantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch onboarding progress")))
 		return
 	}
 	if progress.CurrentStep < stepBarber {
-		c.JSON(http.StatusForbidden, gin.H{"error": "step not available yet"})
+		c.Error(fault.New("onboarding step not available",
+			fault.Code(codes.ErrorsForbidden),
+			fault.Internal("step not available yet"),
+			fault.Public("Este paso aún no está disponible"),
+		))
 		return
 	}
 
 	startTime, err := parseTime(req.StartTime)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid startTime format, use HH:MM or HH:MM:SS"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid startTime format"),
+			fault.Public("El campo 'startTime' debe tener formato HH:MM o HH:MM:SS"),
+		))
 		return
 	}
 	endTime, err := parseTime(req.EndTime)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid endTime format, use HH:MM or HH:MM:SS"})
+		c.Error(fault.Wrap(err,
+			fault.Code(codes.ErrorsBadRequest),
+			fault.Internal("invalid endTime format"),
+			fault.Public("El campo 'endTime' debe tener formato HH:MM o HH:MM:SS"),
+		))
 		return
 	}
 
@@ -76,7 +94,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		AvatarUrl: sql.NullString{},
 		SortOrder: 1,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to create resource")))
 		return
 	}
 
@@ -89,7 +107,7 @@ func (h *Handler) Handle(c *gin.Context) {
 			EndTime:    endTime,
 			IsActive:   true,
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+			c.Error(fault.Wrap(err, fault.Internal("failed to save working hours")))
 			return
 		}
 	}
@@ -98,7 +116,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		TenantID:    tenantID,
 		CurrentStep: stepWhatsApp,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to advance onboarding step")))
 		return
 	}
 

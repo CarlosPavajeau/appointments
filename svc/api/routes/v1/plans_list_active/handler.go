@@ -3,6 +3,7 @@ package plans_list_active
 import (
 	"net/http"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,7 +30,7 @@ func (h *Handler) Path() string   { return "/v1/plans" }
 func (h *Handler) Handle(c *gin.Context) {
 	plans, err := db.Query.ListActivePlans(c.Request.Context(), h.DB.Primary(), h.Environment)
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch plans")))
 		return
 	}
 
