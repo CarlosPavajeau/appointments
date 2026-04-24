@@ -8,7 +8,9 @@ import (
 	"html"
 	"net/http"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/mailer"
 
@@ -41,50 +43,80 @@ func (h *Handler) Path() string {
 func (h *Handler) Handle(c *gin.Context) {
 	tenantID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant id"})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid tenant id"), fault.Public("Id del tenant inválido"),
+			),
+		)
 		return
 	}
 
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid json body"), fault.Public("Campos inválidos en la solicitud"),
+			),
+		)
 		return
 	}
 
 	ctx := c.Request.Context()
-	tenant, err := db.Query.FindTenantByID(ctx, h.DB.Primary(), tenantID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "tenant not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject tenant"})
-		return
+
+	type Result struct {
+		TenantName             string
+		ActivationContactEmail string
 	}
 
-	waConfig, err := db.Query.FindTenantWhatsappConfig(ctx, h.DB.Primary(), tenantID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			logger.Warn("[admin] whatsapp config missing", "tenant_id", tenantID)
-			c.JSON(http.StatusNotFound, gin.H{"error": "whatsapp config not found"})
-			return
+	result, err := db.TxWithResult(ctx, h.DB.Primary(), func(ctx context.Context, txx db.DBTX) (*Result, error) {
+		tenant, err := db.Query.FindTenantByID(ctx, h.DB.Primary(), tenantID)
+		if err != nil {
+			return nil, err
 		}
 
-		logger.Warn("[admin] fetch whatsapp config", "tenant_id", tenantID, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load whatsapp config"})
+		if err := db.Query.RejectTenantActivation(ctx, h.DB.Primary(), db.RejectTenantActivationParams{
+			RejectReason: sql.NullString{String: req.Reason, Valid: req.Reason != ""},
+			TenantID:     tenant.ID,
+		}); err != nil {
+			return nil, err
+		}
+
+		waConfig, err := db.Query.FindTenantWhatsappConfig(ctx, h.DB.Primary(), tenantID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !waConfig.ActivationContactEmail.Valid {
+			return nil, nil
+		}
+
+		return &Result{
+			TenantName:             tenant.Name,
+			ActivationContactEmail: waConfig.ActivationContactEmail.String,
+		}, nil
+	})
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.Error(
+				fault.Wrap(err,
+					fault.Code(codes.ErrorsNotFound),
+					fault.Internal("Tenant not found"), fault.Public("Tenant no encontrado"),
+				),
+			)
+			return
+		}
+
+		c.Error(fault.Wrap(err,
+			fault.Internal("failed to reject tenant")),
+		)
 		return
 	}
 
-	if err := db.Query.RejectTenantActivation(ctx, h.DB.Primary(), db.RejectTenantActivationParams{
-		RejectReason: sql.NullString{String: req.Reason, Valid: req.Reason != ""},
-		TenantID:     tenant.ID,
-	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject tenant"})
-		return
-	}
-
-	if waConfig.ActivationContactEmail.Valid {
-		scheduleRejectionEmail(h.Mailer, waConfig.ActivationContactEmail.String, tenant.Name, req.Reason)
+	if result != nil {
+		scheduleRejectionEmail(h.Mailer, result.ActivationContactEmail, result.TenantName, req.Reason)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "tenant rejected successfully"})
