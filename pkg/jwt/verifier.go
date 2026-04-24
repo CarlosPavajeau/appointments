@@ -47,14 +47,12 @@ func (v *DBVerifier) lookupKey(ctx context.Context, kid string) (any, error) {
 func (v *DBVerifier) VerifyToken(ctx context.Context, tokenStr string) (*Claims, error) {
 	kid, alg, err := extractTokenHeader(tokenStr)
 	if err != nil {
-		logger.Warn("[jwt] malformed token header", "err", err)
 		return nil, errors.New("malformed token")
 	}
 
 	// Enforce algorithm allowlist before touching any key material.
 	// This prevents algorithm confusion attacks (e.g. RS256 → HS256, alg:none).
 	if !isAllowedAlg(alg) {
-		logger.Warn("[jwt] rejected: algorithm not in allowlist", "alg", alg)
 		return nil, fmt.Errorf("algorithm %q is not permitted", alg)
 	}
 
@@ -79,8 +77,6 @@ func (v *DBVerifier) VerifyToken(ctx context.Context, tokenStr string) (*Claims,
 			case *gojwt.SigningMethodRSA, *gojwt.SigningMethodECDSA, *gojwt.SigningMethodEd25519:
 				return key, nil
 			default:
-				logger.Warn("[jwt] rejected: unexpected signing method",
-					"method", fmt.Sprintf("%T", t.Method))
 				return nil, errors.New("unexpected signing method")
 			}
 		},

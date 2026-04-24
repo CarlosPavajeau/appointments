@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"wappiz/pkg/db"
-	"wappiz/pkg/logger"
+	"wappiz/svc/api/openapi"
 
 	"github.com/gin-gonic/gin"
 	gojwt "github.com/golang-jwt/jwt/v5"
@@ -195,38 +195,64 @@ func Init(dbtx db.DBTX, issuer string) {
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if defaultVerifier == nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError,
-				gin.H{"error": "auth verifier not initialised"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, openapi.InternalServerErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "DB verification failed.",
+					Type:   "internal_server_error",
+					Detail: "JWT verifier is not initialized. This is a server configuration error. Contact support.",
+					Status: http.StatusInternalServerError,
+				},
+			})
 			return
 		}
 
 		header := c.GetHeader("Authorization")
 		if len(header) < 8 || header[:7] != "Bearer " {
-			logger.Warn("[jwt] missing or malformed Authorization header",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"len", len(header))
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, openapi.UnauthorizedErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "Missing or invalid Authorization header.",
+					Type:   "unauthorized",
+					Detail: "JWT header is missing or is malformed.",
+					Status: http.StatusUnauthorized,
+				},
+			})
 			return
 		}
 
 		claims, err := defaultVerifier.VerifyToken(c.Request.Context(), header[7:])
 		if err != nil {
 			if errors.Is(err, gojwt.ErrTokenExpired) {
-				logger.Warn("[jwt] token expired",
-					"method", c.Request.Method,
-					"path", c.Request.URL.Path)
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-					"error": "token_expired",
-					"hint":  "obtain a new token from the authentication service",
+				c.AbortWithStatusJSON(http.StatusUnauthorized, openapi.UnauthorizedErrorResponse{
+					Meta: openapi.Meta{
+						RequestId: c.GetString("request_id"),
+					},
+					Error: openapi.BaseError{
+						Title:  "Token expired",
+						Type:   "unauthorized",
+						Detail: "Authentication token is expired. Please obtain a new token and try again.",
+						Status: http.StatusUnauthorized,
+					},
 				})
 				return
 			}
-			logger.Warn("[jwt] invalid token",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"err", err)
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+
+			c.AbortWithStatusJSON(http.StatusUnauthorized, openapi.UnauthorizedErrorResponse{
+				Meta: openapi.Meta{
+					RequestId: c.GetString("request_id"),
+				},
+				Error: openapi.BaseError{
+					Title:  "Token invalid",
+					Type:   "unauthorized",
+					Detail: err.Error(),
+					Status: http.StatusUnauthorized,
+				},
+			})
 			return
 		}
 
@@ -235,11 +261,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		if defaultTenantFinder != nil {
 			tenantID, err := defaultTenantFinder(c.Request.Context(), claims.UserID)
-			if err != nil {
-				logger.Warn("[jwt] tenant lookup failed",
-					"user_id", claims.UserID,
-					"err", err)
-			} else {
+			if err == nil {
 				c.Set("tenant_id", tenantID)
 			}
 		}
