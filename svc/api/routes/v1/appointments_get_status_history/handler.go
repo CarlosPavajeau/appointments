@@ -3,7 +3,9 @@ package appointments_get_status_history
 import (
 	"net/http"
 	"time"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
@@ -30,17 +32,26 @@ func (h *Handler) Path() string   { return "/v1/appointments/:id/history" }
 func (h *Handler) Handle(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid appointment ID"})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsBadRequest),
+				fault.Internal("invalid appointment id"), fault.Public("Id de cita inválido"),
+			),
+		)
 		return
 	}
 
 	tenantID := jwt.TenantIDFromContext(c)
-
 	if _, err := db.Query.FindAppointmentByID(c.Request.Context(), h.DB.Primary(), db.FindAppointmentByIDParams{
 		ID:       id,
 		TenantID: tenantID,
 	}); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "appointment not found"})
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsNotFound),
+				fault.Internal("appointment not found"), fault.Public("La cita no existe"),
+			),
+		)
 		return
 	}
 
@@ -49,7 +60,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		TenantID:      tenantID,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch history"})
+		c.Error(fault.Wrap(err, fault.Internal("failed to fetch history")))
 		return
 	}
 
