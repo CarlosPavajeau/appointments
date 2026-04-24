@@ -71,7 +71,7 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 	if limited {
 		c.Error(
-			fault.Wrap(err,
+			fault.New("resource quota exceeded",
 				fault.Code(codes.ErrorsForbiddenResourceQuotaExceeded),
 				fault.Internal(fmt.Sprintf("tenant %s has reached the resource limit for their plan", tenantID)),
 				fault.Public("Se ha alcanzado el límite de recursos de tu plan. Actualiza tu plan para añadir más recursos."),
