@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"wappiz/pkg/db"
 	"wappiz/pkg/jwt"
+	"wappiz/svc/api/openapi"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -33,7 +34,17 @@ func (h *Handler) Path() string   { return "/v1/resources" }
 func (h *Handler) Handle(c *gin.Context) {
 	var req Request
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"code": "err:request_body_unreadable", "message": err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, openapi.BadRequestErrorResponse{
+			Meta: openapi.Meta{
+				RequestId: c.GetString("request_id"),
+			},
+			Error: openapi.BaseError{
+				Title:  "Bad Request",
+				Type:   "bad_request",
+				Detail: err.Error(),
+				Status: http.StatusBadRequest,
+			},
+		})
 		return
 	}
 
@@ -42,11 +53,31 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	limited, err := h.isResourceLimitReached(ctx, tenantID)
 	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, openapi.InternalServerErrorResponse{
+			Meta: openapi.Meta{
+				RequestId: c.GetString("request_id"),
+			},
+			Error: openapi.BaseError{
+				Title:  "Internal Server Error",
+				Type:   "internal_server_error",
+				Detail: err.Error(),
+				Status: http.StatusInternalServerError,
+			},
+		})
 		return
 	}
 	if limited {
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "resource limit reached for your plan"})
+		c.AbortWithStatusJSON(http.StatusForbidden, openapi.ForbiddenErrorResponse{
+			Meta: openapi.Meta{
+				RequestId: c.GetString("request_id"),
+			},
+			Error: openapi.BaseError{
+				Title:  "Forbidden Access",
+				Type:   "forbidden",
+				Detail: "Resource limit reached for your plan. Please upgrade your plan to add more resources.",
+				Status: http.StatusForbidden,
+			},
+		})
 		return
 	}
 
@@ -58,7 +89,17 @@ func (h *Handler) Handle(c *gin.Context) {
 		AvatarUrl: sql.NullString{String: req.AvatarURL, Valid: req.AvatarURL != ""},
 		SortOrder: 1,
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, openapi.InternalServerErrorResponse{
+			Meta: openapi.Meta{
+				RequestId: c.GetString("request_id"),
+			},
+			Error: openapi.BaseError{
+				Title:  "Internal Server Error",
+				Type:   "internal_server_error",
+				Detail: err.Error(),
+				Status: http.StatusInternalServerError,
+			},
+		})
 		return
 	}
 
