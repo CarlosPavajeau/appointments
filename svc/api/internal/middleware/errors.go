@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"net/http"
+	"wappiz/pkg/codes"
+	"wappiz/pkg/fault"
 	"wappiz/svc/api/openapi"
 
 	"github.com/gin-gonic/gin"
@@ -13,18 +15,37 @@ func WithErrorHandling() gin.HandlerFunc {
 		c.Next()
 
 		if len(c.Errors) > 0 {
-			// If there are errors, we can handle them here. For now, we'll just return a generic error response.
 			err := c.Errors.Last().Err
-			if err.Error() == "resource limit reached" {
+			urn, ok := fault.GetCode(err)
+
+			if !ok {
+				urn = "unknown"
+			}
+
+			switch urn {
+			case codes.ErrorsForbiddenResourceQuotaExceeded:
 				c.AbortWithStatusJSON(http.StatusForbidden, openapi.ForbiddenErrorResponse{
 					Meta: openapi.Meta{
 						RequestId: c.GetString("request_id"),
 					},
 					Error: openapi.BaseError{
-						Title:  "Forbidden Access",
-						Type:   "forbidden",
-						Detail: "Se ha alcanzado el límite de recursos de tu plan. Actualiza tu plan para añadir más recursos.",
+						Title:  "Forbidden",
+						Type:   string(urn),
+						Detail: fault.UserFacingMessage(err),
 						Status: http.StatusForbidden,
+					},
+				})
+
+			default:
+				c.AbortWithStatusJSON(http.StatusInternalServerError, openapi.InternalServerErrorResponse{
+					Meta: openapi.Meta{
+						RequestId: c.GetString("request_id"),
+					},
+					Error: openapi.BaseError{
+						Title:  "Internal Server Error",
+						Type:   string(urn),
+						Detail: fault.UserFacingMessage(err),
+						Status: http.StatusInternalServerError,
 					},
 				})
 			}

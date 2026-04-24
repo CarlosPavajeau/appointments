@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
+	"wappiz/pkg/codes"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/jwt"
 	"wappiz/svc/api/openapi"
 
@@ -67,7 +70,13 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 	if limited {
-		c.Error(errors.New("resource limit reached"))
+		c.Error(
+			fault.Wrap(err,
+				fault.Code(codes.ErrorsForbiddenResourceQuotaExceeded),
+				fault.Internal(fmt.Sprintf("tenant %s has reached the resource limit for their plan", tenantID)),
+				fault.Public("Se ha alcanzado el límite de recursos de tu plan. Actualiza tu plan para añadir más recursos."),
+			),
+		)
 		return
 	}
 
