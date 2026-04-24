@@ -74,7 +74,7 @@ func (h *Handler) Handle(c *gin.Context) {
 			Error: openapi.BaseError{
 				Title:  "Forbidden Access",
 				Type:   "forbidden",
-				Detail: "Resource limit reached for your plan. Please upgrade your plan to add more resources.",
+				Detail: "Se ha alcanzado el límite de recursos de tu plan. Actualiza tu plan para añadir más recursos.",
 				Status: http.StatusForbidden,
 			},
 		})
