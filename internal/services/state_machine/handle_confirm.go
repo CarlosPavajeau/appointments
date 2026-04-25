@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 	"wappiz/pkg/db"
 	apperrors "wappiz/pkg/errors"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 
 	"github.com/google/uuid"
@@ -20,21 +20,21 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 		return s.sendConfirmation(ctx, msg, session)
 	}
 
-	var sessionData SessionData
-	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		return err
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	if err != nil {
+		return fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}
 
 	switch *interactiveID {
 	case "confirm_yes":
 		tenant, err := db.Query.FindTenantByID(ctx, s.db.Primary(), session.TenantID)
 		if err != nil {
-			return fmt.Errorf("find tenant by id: %w", err)
+			return fault.Wrap(err, fault.Internal("find tenant by id"))
 		}
 
 		limited, err := s.isAppointmentLimitReached(ctx, tenant.ID, tenant.AppointmentsThisMonth)
 		if err != nil {
-			return fmt.Errorf("check appointment limit: %w", err)
+			return fault.Wrap(err, fault.Internal("check appointment limit"))
 		}
 		if limited {
 			// TODO: Send limit reached notification
@@ -43,7 +43,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 
 		svc, err := db.Query.FindServiceByID(ctx, s.db.Primary(), *sessionData.ServiceID)
 		if err != nil {
-			return fmt.Errorf("find service by id: %w", err)
+			return fault.Wrap(err, fault.Internal("find service by id"))
 		}
 
 		startsAt := *sessionData.StartsAt
@@ -52,7 +52,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 
 		hasCustomerOverlap, err := s.hasCustomerOverlap(ctx, tenant.ID, session.CustomerID, startsAt, endsAt)
 		if err != nil {
-			return fmt.Errorf("check customer overlap: %w", err)
+			return fault.Wrap(err, fault.Internal("check customer overlap"))
 		}
 		if hasCustomerOverlap {
 			logger.Warn("[scheduling] customer overlap detected on confirm, informing customer",
@@ -78,14 +78,14 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 					"err", err)
 				return s.handleOverlapOnConfirm(ctx, msg, session, sessionData, svc)
 			}
-			return fmt.Errorf("insert appointment: %w", err)
+			return fault.Wrap(err, fault.Internal("insert appointment"))
 		}
 
 		if err := db.Query.UpdateTenantAppointmentCount(ctx, s.db.Primary(), db.UpdateTenantAppointmentCountParams{
 			ID:                    tenant.ID,
 			AppointmentsThisMonth: tenant.AppointmentsThisMonth + 1,
 		}); err != nil {
-			return fmt.Errorf("update tenant appointment count: %w", err)
+			return fault.Wrap(err, fault.Internal("update tenant appointment count"))
 		}
 
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
@@ -98,10 +98,7 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 
 	case "confirm_modify":
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session after confirming modify",
-				"session_id", session.ID,
-				"err", err)
-			return fmt.Errorf("delete session after confirm_modify: %w", err)
+			return fault.Wrap(err, fault.Internal("delete session after confirm_modify"))
 		}
 
 		sessionID := uuid.New()
@@ -114,17 +111,14 @@ func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, sessio
 			Data:             json.RawMessage("{}"),
 			ExpiresAt:        time.Now().Add(sessionTTL),
 		}); err != nil {
-			return fmt.Errorf("create session: %w", err)
+			return fault.Wrap(err, fault.Internal("create session"))
 		}
 
 		return s.sendServiceList(ctx, msg)
 
 	case "confirm_cancel":
 		if err := db.Query.DeleteConversationSession(ctx, s.db.Primary(), session.ID); err != nil {
-			logger.Warn("[scheduling] failed to delete session after confirming cancel",
-				"session_id", session.ID,
-				"err", err)
-			return fmt.Errorf("delete session after confirming cancel: %w", err)
+			return fault.Wrap(err, fault.Internal("delete session after confirm_cancel"))
 		}
 
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
@@ -144,13 +138,13 @@ func (s *service) isAppointmentLimitReached(ctx context.Context, tenantID uuid.U
 
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return false, fmt.Errorf("find active plan by tenant: %w", err)
+			return false, fault.Wrap(err, fault.Internal("find active plan by tenant"))
 		}
 		// No active plan — apply free plan limit.
 	} else {
 		features, err := db.UnmarshalNullableJSONTo[db.PlanFeatures]([]byte(plan.Features))
 		if err != nil {
-			return false, err
+			return false, fault.Wrap(err, fault.Internal("unmarshal plan features"))
 		}
 
 		if features.MaxAppointmentsPerMonth == nil {

@@ -3,10 +3,9 @@ package state_machine
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"fmt"
 	"strings"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 )
 
 func (s *service) handleAwaitingName(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, customer db.FindCustomerByPhoneNumberRow) error {
@@ -22,21 +21,20 @@ func (s *service) handleAwaitingName(ctx context.Context, msg IncomingMessage, s
 		Name: customer.Name,
 		ID:   customer.ID,
 	}); err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("update customer"))
 	}
 
-	var sessionData SessionData
-	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		return err
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	if err != nil {
+		return fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}
 
 	sessionData.ConfirmedName = &name
 	session.Step = string(StepConfirm)
 
-	var err error
 	session, err = s.updateSession(ctx, session, sessionData)
 	if err != nil {
-		return fmt.Errorf("update session: %w", err)
+		return fault.Wrap(err, fault.Internal("update session"))
 	}
 
 	return s.sendConfirmation(ctx, msg, session)
