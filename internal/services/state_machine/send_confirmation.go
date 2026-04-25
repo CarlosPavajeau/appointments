@@ -2,31 +2,32 @@ package state_machine
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"wappiz/pkg/date_formatter"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/whatsapp"
 )
 
 func (s *service) sendConfirmation(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow) error {
-	var sessionData SessionData
-	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		return err
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	if err != nil {
+		return fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}
 
 	if sessionData.ServiceID == nil || sessionData.ResourceID == nil || sessionData.StartsAt == nil {
-		return fmt.Errorf("incomplete session data: missing service, resource, or start time")
+		return errors.New("incomplete session data: missing service, resource, or start time")
 	}
 
 	svc, err := db.Query.FindServiceByID(ctx, s.db.Primary(), *sessionData.ServiceID)
 	if err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("find service by id"))
 	}
 
 	rsc, err := db.Query.FindResourceById(ctx, s.db.Primary(), *sessionData.ResourceID)
 	if err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("find resource by id"))
 	}
 
 	customerName := "Cliente"

@@ -2,10 +2,10 @@ package state_machine
 
 import (
 	"context"
-	"fmt"
 	"wappiz/internal/services/slot_finder"
 	"wappiz/pkg/db"
 	apperrors "wappiz/pkg/errors"
+	"wappiz/pkg/fault"
 )
 
 func (s *service) handleOverlapOnConfirm(
@@ -24,27 +24,27 @@ func (s *service) handleOverlapOnConfirm(
 		},
 	})
 	if err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("get suggested slots"))
 	}
 
 	filteredSuggestions := s.filterSlotsByCustomerAvailability(ctx, session.TenantID, session.CustomerID, suggestions)
 
 	errMsg := buildErrorMessage(apperrors.ErrOverlap, "", filteredSuggestions)
 	if err := s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken, errMsg); err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("send overlap message"))
 	}
 
 	if len(filteredSuggestions) == 0 {
 		session.Step = string(StepSelectDate)
 		if _, err = s.updateSession(ctx, session, sessionData); err != nil {
-			return fmt.Errorf("update session: %w", err)
+			return fault.Wrap(err, fault.Internal("update session"))
 		}
 		return nil
 	}
 
 	session.Step = string(StepSelectTime)
 	if _, err = s.updateSession(ctx, session, sessionData); err != nil {
-		return fmt.Errorf("update session: %w", err)
+		return fault.Wrap(err, fault.Internal("update session"))
 	}
 
 	return s.sendSlotList(ctx, msg, filteredSuggestions)

@@ -3,14 +3,14 @@ package state_machine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 )
 
 func (s *service) updateSession(ctx context.Context, session db.FindCustomerActiveConversationSessionRow, sessionData SessionData) (db.FindCustomerActiveConversationSessionRow, error) {
 	updatedData, err := json.Marshal(sessionData)
 	if err != nil {
-		return session, fmt.Errorf("marshal session data: %w", err)
+		return session, fault.Wrap(err, fault.Internal("marshal session data"))
 	}
 
 	session.Data = updatedData
@@ -21,7 +21,7 @@ func (s *service) updateSession(ctx context.Context, session db.FindCustomerActi
 		ExpiresAt: session.ExpiresAt,
 		ID:        session.ID,
 	}); err != nil {
-		return session, fmt.Errorf("update session: %w", err)
+		return session, fault.Wrap(err, fault.Internal("update session"))
 	}
 
 	return session, nil

@@ -2,23 +2,18 @@ package state_machine
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 	"wappiz/internal/services/slot_finder"
 	"wappiz/pkg/date_parser"
 	"wappiz/pkg/db"
 	apperrors "wappiz/pkg/errors"
-	"wappiz/pkg/logger"
+	"wappiz/pkg/fault"
 )
 
 func (s *service) validateAndFindSlots(ctx context.Context, input, timezone string, session db.FindCustomerActiveConversationSessionRow) (*DateValidationResult, error) {
 	loc, _ := time.LoadLocation(timezone)
 	t, err := date_parser.ParseDateTime(input, loc)
 	if err != nil {
-		logger.Warn("[scheduling] failed to parse date input",
-			"input", input,
-			"err", err)
 		return nil, err
 	}
 
@@ -26,14 +21,14 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 		return nil, apperrors.ErrDateInPast
 	}
 
-	var sessionData SessionData
-	if err := json.Unmarshal(session.Data, &sessionData); err != nil {
-		return nil, err
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	if err != nil {
+		return nil, fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}
 
 	svc, err := db.Query.FindServiceByID(ctx, s.db.Primary(), *sessionData.ServiceID)
 	if err != nil {
-		return nil, err
+		return nil, fault.Wrap(err, fault.Internal("find service by id"))
 	}
 
 	endsAt := t.Add(time.Duration(svc.DurationMinutes) * time.Minute)
@@ -42,7 +37,7 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 	// confirmation screen is never shown when the customer is already busy.
 	customerConflict, err := s.hasCustomerOverlap(ctx, session.TenantID, session.CustomerID, t, endsAt)
 	if err != nil {
-		return nil, fmt.Errorf("check customer overlap: %w", err)
+		return nil, fault.Wrap(err, fault.Internal("check customer overlap"))
 	}
 
 	if sessionData.ResourceID != nil {
@@ -56,7 +51,7 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 		})
 
 		if err != nil {
-			return nil, err
+			return nil, fault.Wrap(err, fault.Internal("find available slots"))
 		}
 
 		if len(slots) == 0 {
@@ -85,7 +80,7 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 		})
 
 		if err != nil {
-			return nil, err
+			return nil, fault.Wrap(err, fault.Internal("get suggested slots"))
 		}
 
 		filtered := s.filterSlotsByCustomerAvailability(ctx, session.TenantID, session.CustomerID, suggestions)
@@ -98,7 +93,7 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fault.Wrap(err, fault.Internal("find resources by service id"))
 	}
 
 	if !customerConflict {
