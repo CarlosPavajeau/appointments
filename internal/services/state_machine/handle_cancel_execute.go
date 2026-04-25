@@ -42,13 +42,37 @@ func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, 
 			"No encontramos esa cita. Por favor intenta de nuevo.")
 	}
 
-	if err := db.Query.UpdateAppointment(ctx, s.db.Primary(), db.UpdateAppointmentParams{
-		Status:       db.AppointmentStatusCancelled,
-		CancelledBy:  sql.NullString{},
-		CancelReason: sql.NullString{String: "Cancelado por el cliente", Valid: true},
-		CompletedAt:  sql.NullTime{},
-		ID:           appointmentID,
-	}); err != nil {
+	err = db.Tx(ctx, s.db.Primary(), func(ctx context.Context, txx db.DBTX) error {
+		err := db.Query.UpdateAppointment(ctx, txx, db.UpdateAppointmentParams{
+			Status:       db.AppointmentStatusCancelled,
+			CancelledBy:  sql.NullString{},
+			CancelReason: sql.NullString{String: "Cancelado por el cliente", Valid: true},
+			CompletedAt:  sql.NullTime{},
+			ID:           appointmentID,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		err = db.Query.InsertAppointmentStatusHistory(ctx, txx, db.InsertAppointmentStatusHistoryParams{
+			ID:            uuid.New(),
+			AppointmentID: appointmentID,
+			FromStatus:    appointment.Status,
+			ToStatus:      db.AppointmentStatusCancelled,
+			ChangedBy:     sql.NullString{Valid: false},
+			ChangedByRole: sql.NullString{Valid: false},
+			Reason:        sql.NullString{String: "Cancelado por el cliente", Valid: true},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		logger.Warn("[scheduling] failed to update appointment status to cancelled",
 			"appointment_id", appointmentID,
 			"err", err)
