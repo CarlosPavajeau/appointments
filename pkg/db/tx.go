@@ -9,6 +9,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"wappiz/pkg/codes"
+	"wappiz/pkg/fault"
 )
 
 // TxWithResult executes fn within a database transaction and returns the result.
@@ -67,7 +69,10 @@ func TxWithResult[T any](ctx context.Context, db *Replica, fn func(context.Conte
 
 	tx, err := db.Begin(ctx)
 	if err != nil {
-		return t, errors.New("database failed to create transaction")
+		return t, fault.Wrap(err,
+			fault.Code(codes.AppErrorsInternalServiceUnavailable),
+			fault.Internal("database failed to create transaction"), fault.Public("Unable to start database transaction."),
+		)
 	}
 
 	t, err = fn(ctx, tx)
@@ -75,7 +80,10 @@ func TxWithResult[T any](ctx context.Context, db *Replica, fn func(context.Conte
 		rollbackErr := tx.Rollback()
 
 		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
-			return t, errors.New("database failed to rollback transaction")
+			return t, fault.Wrap(rollbackErr,
+				fault.Code(codes.AppErrorsInternalServiceUnavailable),
+				fault.Internal("database failed to rollback transaction"), fault.Public("Unable to rollback database transaction."),
+			)
 		}
 
 		return t, err
@@ -83,7 +91,10 @@ func TxWithResult[T any](ctx context.Context, db *Replica, fn func(context.Conte
 
 	err = tx.Commit()
 	if err != nil {
-		return t, errors.New("database failed to commit transaction")
+		return t, fault.Wrap(err,
+			fault.Code(codes.AppErrorsInternalServiceUnavailable),
+			fault.Internal("database failed to commit transaction"), fault.Public("Unable to commit database transaction."),
+		)
 	}
 
 	return t, nil

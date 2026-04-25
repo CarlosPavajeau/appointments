@@ -13,4 +13,11 @@ const (
 
 	// ErrorsForbiddenResourceQuotaExceeded indicates the tenant has exceeded their resource quota for the requested operation.
 	ErrorsForbiddenResourceQuotaExceeded URN = "err:user:forbidden:resource_quota_exceeded"
+
+	// Internal
+
+	// UnexpectedError represents an unhandled or unexpected error condition.
+	AppErrorsInternalUnexpectedError URN = "err:application:unexpected_error"
+	// ServiceUnavailable indicates a service is temporarily unavailable.
+	AppErrorsInternalServiceUnavailable URN = "err:application:service_unavailable"
 )
