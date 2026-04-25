@@ -276,16 +276,19 @@ type Querier interface {
 	FindCustomerActiveConversationSession(ctx context.Context, db DBTX, arg FindCustomerActiveConversationSessionParams) (FindCustomerActiveConversationSessionRow, error)
 	//FindCustomerByID
 	//
-	//  SELECT id,
-	//         tenant_id,
-	//         phone_number,
-	//         name,
-	//         is_blocked,
-	//         no_show_count,
-	//         late_cancel_count,
-	//         created_at
-	//  FROM customers
-	//  WHERE id = $1
+	//  SELECT c.id,
+	//         c.tenant_id,
+	//         c.phone_number,
+	//         c.name,
+	//         c.is_blocked,
+	//         c.no_show_count,
+	//         c.late_cancel_count,
+	//         COUNT(a.id) as appointment_count,
+	//         c.created_at
+	//  FROM customers c
+	//           INNER JOIN appointments a ON c.id = a.customer_id
+	//  WHERE c.id = $1
+	//  GROUP BY c.id
 	//  LIMIT 1
 	FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (FindCustomerByIDRow, error)
 	//FindCustomerByPhoneNumber

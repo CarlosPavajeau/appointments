@@ -14,42 +14,49 @@ import (
 )
 
 const findCustomerByID = `-- name: FindCustomerByID :one
-SELECT id,
-       tenant_id,
-       phone_number,
-       name,
-       is_blocked,
-       no_show_count,
-       late_cancel_count,
-       created_at
-FROM customers
-WHERE id = $1
+SELECT c.id,
+       c.tenant_id,
+       c.phone_number,
+       c.name,
+       c.is_blocked,
+       c.no_show_count,
+       c.late_cancel_count,
+       COUNT(a.id) as appointment_count,
+       c.created_at
+FROM customers c
+         INNER JOIN appointments a ON c.id = a.customer_id
+WHERE c.id = $1
+GROUP BY c.id
 LIMIT 1
 `
 
 type FindCustomerByIDRow struct {
-	ID              uuid.UUID      `db:"id"`
-	TenantID        uuid.UUID      `db:"tenant_id"`
-	PhoneNumber     string         `db:"phone_number"`
-	Name            sql.NullString `db:"name"`
-	IsBlocked       bool           `db:"is_blocked"`
-	NoShowCount     int32          `db:"no_show_count"`
-	LateCancelCount int32          `db:"late_cancel_count"`
-	CreatedAt       time.Time      `db:"created_at"`
+	ID               uuid.UUID      `db:"id"`
+	TenantID         uuid.UUID      `db:"tenant_id"`
+	PhoneNumber      string         `db:"phone_number"`
+	Name             sql.NullString `db:"name"`
+	IsBlocked        bool           `db:"is_blocked"`
+	NoShowCount      int32          `db:"no_show_count"`
+	LateCancelCount  int32          `db:"late_cancel_count"`
+	AppointmentCount int64          `db:"appointment_count"`
+	CreatedAt        time.Time      `db:"created_at"`
 }
 
 // FindCustomerByID
 //
-//	SELECT id,
-//	       tenant_id,
-//	       phone_number,
-//	       name,
-//	       is_blocked,
-//	       no_show_count,
-//	       late_cancel_count,
-//	       created_at
-//	FROM customers
-//	WHERE id = $1
+//	SELECT c.id,
+//	       c.tenant_id,
+//	       c.phone_number,
+//	       c.name,
+//	       c.is_blocked,
+//	       c.no_show_count,
+//	       c.late_cancel_count,
+//	       COUNT(a.id) as appointment_count,
+//	       c.created_at
+//	FROM customers c
+//	         INNER JOIN appointments a ON c.id = a.customer_id
+//	WHERE c.id = $1
+//	GROUP BY c.id
 //	LIMIT 1
 func (q *Queries) FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (FindCustomerByIDRow, error) {
 	row := db.QueryRowContext(ctx, findCustomerByID, id)
@@ -62,6 +69,7 @@ func (q *Queries) FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (
 		&i.IsBlocked,
 		&i.NoShowCount,
 		&i.LateCancelCount,
+		&i.AppointmentCount,
 		&i.CreatedAt,
 	)
 	return i, err
