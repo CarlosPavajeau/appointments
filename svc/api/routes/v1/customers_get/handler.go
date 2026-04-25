@@ -12,11 +12,13 @@ import (
 )
 
 type Response struct {
-	ID          uuid.UUID `json:"id"`
-	PhoneNumber string    `json:"phoneNumber"`
-	Name        *string   `json:"name"`
-	DisplayName string    `json:"displayName"`
-	IsBlocked   bool      `json:"isBlocked"`
+	ID              uuid.UUID `json:"id"`
+	PhoneNumber     string    `json:"phoneNumber"`
+	Name            *string   `json:"name"`
+	DisplayName     string    `json:"displayName"`
+	IsBlocked       bool      `json:"isBlocked"`
+	NoShowCount     int32     `json:"noShowCount"`
+	LateCancelCount int32     `json:"lateCancelCount"`
 }
 
 type Handler struct {
@@ -67,10 +69,12 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, Response{
-		ID:          customer.ID,
-		PhoneNumber: customer.PhoneNumber,
-		Name:        name,
-		DisplayName: displayName,
-		IsBlocked:   customer.IsBlocked,
+		ID:              customer.ID,
+		PhoneNumber:     customer.PhoneNumber,
+		Name:            name,
+		DisplayName:     displayName,
+		IsBlocked:       customer.IsBlocked,
+		NoShowCount:     customer.NoShowCount,
+		LateCancelCount: customer.LateCancelCount,
 	})
 }

@@ -14,24 +14,40 @@ import (
 )
 
 const findCustomerByID = `-- name: FindCustomerByID :one
-SELECT id, tenant_id, phone_number, name, is_blocked, created_at
+SELECT id,
+       tenant_id,
+       phone_number,
+       name,
+       is_blocked,
+       no_show_count,
+       late_cancel_count,
+       created_at
 FROM customers
 WHERE id = $1
 LIMIT 1
 `
 
 type FindCustomerByIDRow struct {
-	ID          uuid.UUID      `db:"id"`
-	TenantID    uuid.UUID      `db:"tenant_id"`
-	PhoneNumber string         `db:"phone_number"`
-	Name        sql.NullString `db:"name"`
-	IsBlocked   bool           `db:"is_blocked"`
-	CreatedAt   time.Time      `db:"created_at"`
+	ID              uuid.UUID      `db:"id"`
+	TenantID        uuid.UUID      `db:"tenant_id"`
+	PhoneNumber     string         `db:"phone_number"`
+	Name            sql.NullString `db:"name"`
+	IsBlocked       bool           `db:"is_blocked"`
+	NoShowCount     int32          `db:"no_show_count"`
+	LateCancelCount int32          `db:"late_cancel_count"`
+	CreatedAt       time.Time      `db:"created_at"`
 }
 
 // FindCustomerByID
 //
-//	SELECT id, tenant_id, phone_number, name, is_blocked, created_at
+//	SELECT id,
+//	       tenant_id,
+//	       phone_number,
+//	       name,
+//	       is_blocked,
+//	       no_show_count,
+//	       late_cancel_count,
+//	       created_at
 //	FROM customers
 //	WHERE id = $1
 //	LIMIT 1
@@ -44,6 +60,8 @@ func (q *Queries) FindCustomerByID(ctx context.Context, db DBTX, id uuid.UUID) (
 		&i.PhoneNumber,
 		&i.Name,
 		&i.IsBlocked,
+		&i.NoShowCount,
+		&i.LateCancelCount,
 		&i.CreatedAt,
 	)
 	return i, err
