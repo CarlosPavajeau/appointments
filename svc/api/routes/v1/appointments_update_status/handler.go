@@ -96,45 +96,41 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	tx, err := h.DB.Primary().Begin(c.Request.Context())
+	err = db.Tx(c.Request.Context(), h.DB.Primary(), func(ctx context.Context, tx db.DBTX) error {
+		updateParams := db.UpdateAppointmentParams{
+			Status:       db.AppointmentStatus(req.Status),
+			CancelledBy:  sql.NullString{},
+			CancelReason: sql.NullString{},
+			CompletedAt:  sql.NullTime{},
+			ID:           id,
+		}
+
+		if req.Status == "cancelled" {
+			updateParams.CancelledBy = sql.NullString{String: updatedBy, Valid: updatedBy != ""}
+			updateParams.CancelReason = sql.NullString{String: req.Reason, Valid: req.Reason != ""}
+		}
+
+		if err := db.Query.UpdateAppointment(c.Request.Context(), tx, updateParams); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to update appointment status"))
+		}
+
+		if err := db.Query.InsertAppointmentStatusHistory(c.Request.Context(), tx, db.InsertAppointmentStatusHistoryParams{
+			ID:            uuid.New(),
+			AppointmentID: id,
+			FromStatus:    appt.Status,
+			ToStatus:      db.AppointmentStatus(req.Status),
+			ChangedBy:     sql.NullString{String: updatedBy, Valid: updatedBy != ""},
+			ChangedByRole: sql.NullString{String: role, Valid: role != ""},
+			Reason:        sql.NullString{String: req.Reason, Valid: req.Reason != ""},
+		}); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to insert appointment status history"))
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to begin transaction")))
-		return
-	}
-	defer tx.Rollback()
-
-	updateParams := db.UpdateAppointmentParams{
-		Status:       db.AppointmentStatus(req.Status),
-		CancelledBy:  sql.NullString{},
-		CancelReason: sql.NullString{},
-		CompletedAt:  sql.NullTime{},
-		ID:           id,
-	}
-	if req.Status == "cancelled" {
-		updateParams.CancelledBy = sql.NullString{String: updatedBy, Valid: updatedBy != ""}
-		updateParams.CancelReason = sql.NullString{String: req.Reason, Valid: req.Reason != ""}
-	}
-
-	if err := db.Query.UpdateAppointment(c.Request.Context(), tx, updateParams); err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to update appointment status")))
-		return
-	}
-
-	if err := db.Query.InsertAppointmentStatusHistory(c.Request.Context(), tx, db.InsertAppointmentStatusHistoryParams{
-		ID:            uuid.New(),
-		AppointmentID: id,
-		FromStatus:    appt.Status,
-		ToStatus:      db.AppointmentStatus(req.Status),
-		ChangedBy:     sql.NullString{String: updatedBy, Valid: updatedBy != ""},
-		ChangedByRole: sql.NullString{String: role, Valid: role != ""},
-		Reason:        sql.NullString{String: req.Reason, Valid: req.Reason != ""},
-	}); err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to insert appointment status history")))
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to commit transaction")))
+		c.Error(err)
 		return
 	}
 
