@@ -67,7 +67,7 @@ func Run(ctx context.Context, cfg Config) error {
 	r.DeferCtx(shutdownGrafana)
 
 	database, err := db.New(db.Config{
-		PrimaryDns: cfg.DatabaseURL,
+		PrimaryDSN: cfg.DatabaseURL,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to create db: %w", err)

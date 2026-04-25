@@ -18,7 +18,7 @@ func RequireDatabase(t *testing.T) db.Database {
 	}
 
 	database, err := db.New(db.Config{
-		PrimaryDns: dsn,
+		PrimaryDSN: dsn,
 	})
 	if err != nil {
 		t.Fatalf("failed to connect integration database: %v", err)

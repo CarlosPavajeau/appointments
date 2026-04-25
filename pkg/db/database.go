@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"time"
+	"wappiz/pkg/assert"
 	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 
@@ -12,7 +13,8 @@ import (
 
 // Config defines the parameters needed to establish database connections.
 type Config struct {
-	PrimaryDns string
+	// The primary DSN for your database. This must support both reads and writes.
+	PrimaryDSN string
 }
 
 // database implements the Database interface, providing access to database replicas
@@ -49,10 +51,16 @@ func open(dns string) (*sql.DB, error) {
 // It establishes connections to the primary database.
 // Returns an error if connections cannot be established or if DSNs are misconfigured.
 func New(config Config) (*database, error) {
-	primary, err := open(config.PrimaryDns)
-
+	err := assert.All(
+		assert.NotEmpty(config.PrimaryDSN),
+	)
 	if err != nil {
-		return nil, err
+		return nil, fault.Wrap(err, fault.Internal("invalid configuration"))
+	}
+
+	primary, err := open(config.PrimaryDSN)
+	if err != nil {
+		return nil, fault.Wrap(err, fault.Internal("cannot open primary replica"))
 	}
 
 	primaryReplica := &Replica{
