@@ -21,7 +21,7 @@ func (s *service) validateAndFindSlots(ctx context.Context, input, timezone stri
 		return nil, apperrors.ErrDateInPast
 	}
 
-	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))
 	if err != nil {
 		return nil, fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}

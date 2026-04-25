@@ -19,7 +19,7 @@ func (s *service) handleSelectTime(ctx context.Context, msg IncomingMessage, ses
 			"Por favor selecciona una de las opciones de la lista 👆")
 	}
 
-	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))
 	if err != nil {
 		return fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}

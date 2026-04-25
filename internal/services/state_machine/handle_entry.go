@@ -60,7 +60,7 @@ func (s *service) handleEntry(ctx context.Context, msg IncomingMessage, customer
 		return fault.Wrap(err, fault.Internal("find tenant"))
 	}
 
-	tenantSettings, err := db.UnmarshalNullableJSONTo[db.TenantSettings](tenant.Settings)
+	tenantSettings, err := db.UnmarshalNullableJSONTo[db.TenantSettings]([]byte(tenant.Settings))
 	if err != nil {
 		return fault.Wrap(err, fault.Internal("unmarshal tenant settings"))
 	}

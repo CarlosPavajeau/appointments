@@ -12,7 +12,7 @@ import (
 func (s *service) handleSelectResource(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow) error {
 	interactiveID := msg.InteractiveID
 
-	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))
 	if err != nil {
 		logger.Warn("[scheduling] failed to unmarshal session data on select resource step",
 			"session_id", session.ID,

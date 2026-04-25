@@ -14,7 +14,7 @@ func (s *service) handleSelectService(ctx context.Context, msg IncomingMessage, 
 		return s.sendServiceList(ctx, msg)
 	}
 
-	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))
 	if err != nil {
 		logger.Warn("[scheduling] failed to unmarshal session data on select service step",
 			"session_id", session.ID,

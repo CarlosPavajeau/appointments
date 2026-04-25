@@ -8,7 +8,7 @@ import (
 )
 
 func (s *service) handleSelectDate(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, customer db.FindCustomerByPhoneNumberRow) error {
-	sessionData, err := db.UnmarshalNullableJSONTo[SessionData](session.Data)
+	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))
 	if err != nil {
 		return fault.Wrap(err, fault.Internal("unmarshal session data"))
 	}
