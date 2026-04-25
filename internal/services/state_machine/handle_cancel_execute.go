@@ -11,7 +11,7 @@ import (
 )
 
 func (s *service) handleCancelExecute(ctx context.Context, msg IncomingMessage, customer db.FindCustomerByPhoneNumberRow) error {
-	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "cancel_"))
+	appointmentID, err := uuid.Parse(strings.TrimPrefix(*msg.InteractiveID, "confirm_cancel_"))
 	if err != nil {
 		logger.Warn("[scheduling] failed to parse interactive id from cancel confirmation",
 			"interactive_id", *msg.InteractiveID,
