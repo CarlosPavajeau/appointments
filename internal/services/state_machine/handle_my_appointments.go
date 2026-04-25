@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"wappiz/pkg/date_formatter"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/whatsapp"
 )
 
@@ -15,7 +16,7 @@ func (s *service) handleMyAppointments(ctx context.Context, msg IncomingMessage,
 	})
 
 	if err != nil {
-		return fmt.Errorf("find appointments: %w", err)
+		return fault.Wrap(err, fault.Internal("find appointments"))
 	}
 
 	if len(appt) == 0 {
