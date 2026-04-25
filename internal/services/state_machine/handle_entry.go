@@ -3,10 +3,10 @@ package state_machine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/whatsapp"
 
@@ -29,7 +29,7 @@ func (s *service) handleEntry(ctx context.Context, msg IncomingMessage, customer
 				Data:             json.RawMessage("{}"),
 				ExpiresAt:        time.Now().Add(sessionTTL),
 			}); err != nil {
-				return fmt.Errorf("create session: %w", err)
+				return fault.Wrap(err, fault.Internal("create session"))
 			}
 
 			return s.sendServiceList(ctx, msg)
@@ -57,17 +57,12 @@ func (s *service) handleEntry(ctx context.Context, msg IncomingMessage, customer
 
 	tenant, err := db.Query.FindTenantByID(ctx, s.db.Primary(), msg.TenantID)
 	if err != nil {
-		logger.Error("[scheduling] failed to find tenant for entry step",
-			"tenant_id", msg.TenantID,
-			"err", err)
-		return fmt.Errorf("find tenant: %w", err)
+		return fault.Wrap(err, fault.Internal("find tenant"))
 	}
 
 	var tenantSettings db.TenantSettings
 	if err := json.Unmarshal(tenant.Settings, &tenantSettings); err != nil {
-		logger.Warn("[scheduling] failed to unmarshal tenant settings",
-			"err", err)
-		return err
+		return fault.Wrap(err, fault.Internal("unmarshal tenant settings"))
 	}
 
 	var welcomeMsg string
