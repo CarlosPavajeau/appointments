@@ -2,7 +2,10 @@ package state_machine
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 
 	"github.com/google/uuid"
@@ -20,6 +23,10 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 		PhoneNumber: msg.From,
 	})
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fault.Wrap(err, fault.Internal("find customer by phone number"))
+		}
+
 		logger.Info("[scheduling] customer not found, creating new one",
 			"tenant_id", msg.TenantID,
 			"phone_number", msg.From)
@@ -29,24 +36,15 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 			TenantID:    msg.TenantID,
 			PhoneNumber: msg.From,
 		}); err != nil {
-			logger.Error("[scheduling] failed to create customer",
-				"tenant_id", msg.TenantID,
-				"phone_number", msg.From,
-				"err", err)
-			return err
+			return fault.Wrap(err, fault.Internal("insert customer"))
 		}
 
 		customer, err = db.Query.FindCustomerByPhoneNumber(ctx, s.db.Primary(), db.FindCustomerByPhoneNumberParams{
 			TenantID:    msg.TenantID,
 			PhoneNumber: msg.From,
 		})
-
 		if err != nil {
-			logger.Error("[scheduling] failed to retrieve newly created customer",
-				"tenant_id", msg.TenantID,
-				"phone_number", msg.From,
-				"err", err)
-			return err
+			return fault.Wrap(err, fault.Internal("find newly created customer"))
 		}
 	}
 
@@ -62,7 +60,10 @@ func (s *service) Process(ctx context.Context, msg IncomingMessage) error {
 		CustomerID: customer.ID,
 	})
 
-	if err != nil { // TODO: Assume session don't exist, improve this check
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return fault.Wrap(err, fault.Internal("find active conversation session"))
+		}
 		return s.handleEntry(ctx, msg, customer)
 	}
 
