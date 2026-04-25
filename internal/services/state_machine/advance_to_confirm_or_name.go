@@ -2,8 +2,8 @@ package state_machine
 
 import (
 	"context"
-	"fmt"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 )
 
 func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, sessionData SessionData, customer db.FindCustomerByPhoneNumberRow) error {
@@ -14,7 +14,7 @@ func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessag
 
 		session, err = s.updateSession(ctx, session, sessionData)
 		if err != nil {
-			return fmt.Errorf("update session: %w", err)
+			return fault.Wrap(err, fault.Internal("update session"))
 		}
 
 		return s.sendConfirmation(ctx, msg, session)
@@ -22,7 +22,7 @@ func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessag
 
 	session.Step = string(StepAwaitingName)
 	if _, err = s.updateSession(ctx, session, sessionData); err != nil {
-		return fmt.Errorf("update session: %w", err)
+		return fault.Wrap(err, fault.Internal("update session"))
 	}
 
 	return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,
