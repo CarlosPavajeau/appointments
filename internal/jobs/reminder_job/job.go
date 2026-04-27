@@ -8,6 +8,7 @@ import (
 	"wappiz/pkg/crypto"
 	"wappiz/pkg/date_formatter"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/whatsapp"
 
@@ -49,65 +50,63 @@ func (j *job) Run(ctx context.Context) {
 }
 
 func (j *job) process(ctx context.Context) error {
-	tx, err := j.db.Primary().Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	err := db.Tx(ctx, j.db.Primary(), func(ctx context.Context, txx db.DBTX) error {
+		if err := db.Query.ClaimDueAppointmentReminderEvents(ctx, txx); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to claim due appointment reminders"))
+		}
 
-	if err := db.Query.ClaimDueAppointmentReminderEvents(ctx, tx); err != nil {
-		return err
-	}
+		pending, err := db.Query.FindPendingAppointmentReminderEvents(ctx, txx)
+		if err != nil {
+			return fault.Wrap(err, fault.Internal("failed to find pending appointment reminders"))
+		}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
+		waConfigs := make(map[uuid.UUID]db.FindTenantWhatsappConfigRow)
+		customers := make(map[uuid.UUID]db.FindCustomerByIDRow)
+		decryptedByTenant := make(map[uuid.UUID]string)
+		decryptErrByTenant := make(map[uuid.UUID]error)
 
-	pending, err := db.Query.FindPendingAppointmentReminderEvents(ctx, j.db.Primary())
-	if err != nil {
-		return err
-	}
+		for _, reminder := range pending {
+			waConfig, ok := waConfigs[reminder.TenantID]
 
-	waConfigs := make(map[uuid.UUID]db.FindTenantWhatsappConfigRow)
-	customers := make(map[uuid.UUID]db.FindCustomerByIDRow)
-	decryptedByTenant := make(map[uuid.UUID]string)
-	decryptErrByTenant := make(map[uuid.UUID]error)
+			if !ok {
+				waConfig, err = db.Query.FindTenantWhatsappConfig(ctx, txx, reminder.TenantID)
+				if err != nil {
+					j.markReminderFailed(ctx, txx, reminder.ID, err)
+					continue
+				}
 
-	for _, reminder := range pending {
-		waConfig, ok := waConfigs[reminder.TenantID]
+				waConfigs[reminder.TenantID] = waConfig
+			}
 
-		if !ok {
-			waConfig, err = db.Query.FindTenantWhatsappConfig(ctx, j.db.Primary(), reminder.TenantID)
-			if err != nil {
-				j.markReminderFailed(ctx, reminder.ID, err)
+			customer, ok := customers[reminder.CustomerID]
+			if !ok {
+				customer, err = db.Query.FindCustomerByID(ctx, txx, reminder.CustomerID)
+				if err != nil {
+					j.markReminderFailed(ctx, txx, reminder.ID, err)
+					continue
+				}
+				customers[reminder.CustomerID] = customer
+			}
+
+			if err := j.sendReminder(ctx, reminder, customer, waConfig, decryptedByTenant, decryptErrByTenant); err != nil {
+				j.markReminderFailed(ctx, txx, reminder.ID, err)
+				logger.Warn("[reminder_job] failed to send reminder",
+					"err", err)
 				continue
 			}
 
-			waConfigs[reminder.TenantID] = waConfig
-		}
-
-		customer, ok := customers[reminder.CustomerID]
-		if !ok {
-			customer, err = db.Query.FindCustomerByID(ctx, j.db.Primary(), reminder.CustomerID)
-			if err != nil {
-				j.markReminderFailed(ctx, reminder.ID, err)
-				continue
+			if err := j.markReminderSent(ctx, txx, reminder); err != nil {
+				logger.Warn("[reminder_job] failed to mark reminder as sent",
+					"event_id", reminder.ID,
+					"err", err)
 			}
-			customers[reminder.CustomerID] = customer
 		}
 
-		if err := j.sendReminder(ctx, reminder, customer, waConfig, decryptedByTenant, decryptErrByTenant); err != nil {
-			j.markReminderFailed(ctx, reminder.ID, err)
-			logger.Warn("[reminder_job] failed to send reminder",
-				"err", err)
-			continue
-		}
+		return nil
+	})
 
-		if err := j.markReminderSent(ctx, reminder); err != nil {
-			logger.Warn("[reminder_job] failed to mark reminder as sent",
-				"event_id", reminder.ID,
-				"err", err)
-		}
+	if err != nil {
+		return fault.Wrap(err, fault.Internal("failed to process job"))
 	}
 
 	return nil
@@ -150,11 +149,11 @@ func (j *job) sendReminder(
 
 	decrypted, err := j.decryptedTokenForTenant(waConfig.TenantID, waConfig.AccessToken.String, decryptedByTenant, decryptErrByTenant)
 	if err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("failed to decrypt token"))
 	}
 
 	if err := j.whatsapp.SendText(ctx, customer.PhoneNumber, waConfig.PhoneNumberID.String, decrypted, body); err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("failed to send reminder"))
 	}
 
 	return nil
@@ -183,34 +182,28 @@ func (j *job) decryptedTokenForTenant(
 	return tok, nil
 }
 
-func (j *job) markReminderSent(ctx context.Context, reminder db.FindPendingAppointmentReminderEventsRow) error {
-	tx, err := j.db.Primary().Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if err := db.Query.MarkAppointmentReminderSentByType(ctx, tx, db.MarkAppointmentReminderSentByTypeParams{
+func (j *job) markReminderSent(ctx context.Context, txx db.DBTX, reminder db.FindPendingAppointmentReminderEventsRow) error {
+	if err := db.Query.MarkAppointmentReminderSentByType(ctx, txx, db.MarkAppointmentReminderSentByTypeParams{
 		ReminderType:  reminder.ReminderType,
 		AppointmentID: reminder.AppointmentID,
 	}); err != nil {
-		return err
+		return fault.Wrap(err, fault.Internal("failed to mark reminder as sent"))
 	}
 
-	if err := db.Query.MarkAppointmentReminderEventSent(ctx, tx, reminder.ID); err != nil {
-		return err
+	if err := db.Query.MarkAppointmentReminderEventSent(ctx, txx, reminder.ID); err != nil {
+		return fault.Wrap(err, fault.Internal("failed to mark reminder as sent"))
 	}
 
-	return tx.Commit()
+	return nil
 }
 
-func (j *job) markReminderFailed(ctx context.Context, eventID uuid.UUID, reminderErr error) {
+func (j *job) markReminderFailed(ctx context.Context, txx db.DBTX, eventID uuid.UUID, reminderErr error) {
 	errMsg := reminderErr.Error()
 	if len(errMsg) > 1000 {
 		errMsg = errMsg[:1000]
 	}
 
-	if err := db.Query.MarkAppointmentReminderEventFailed(ctx, j.db.Primary(), db.MarkAppointmentReminderEventFailedParams{
+	if err := db.Query.MarkAppointmentReminderEventFailed(ctx, txx, db.MarkAppointmentReminderEventFailedParams{
 		ID:        eventID,
 		LastError: sql.NullString{String: errMsg, Valid: true},
 	}); err != nil {
