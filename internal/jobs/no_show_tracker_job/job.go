@@ -8,6 +8,7 @@ import (
 	"time"
 	"wappiz/pkg/crypto"
 	"wappiz/pkg/db"
+	"wappiz/pkg/fault"
 	"wappiz/pkg/logger"
 	"wappiz/pkg/whatsapp"
 
@@ -67,139 +68,132 @@ func (j *job) Run(ctx context.Context) {
 }
 
 func (j *job) process(ctx context.Context) error {
-	tx, err := j.db.Primary().Begin(ctx)
-	if err != nil {
-		logger.Warn("[no_show_tracker] failed to begin transaction",
-			"err", err)
-		return err
-	}
-	defer tx.Rollback()
-
 	affected := make(map[customerTenantKey]struct{})
 	noShowUpdates := make(map[customerTenantKey]int32)
 	lateCancelUpdates := make(map[customerTenantKey]int32)
 
-	unattended, err := db.Query.MarkUnattendedAppointmentsNoShow(ctx, tx)
-	if err != nil {
-		logger.Warn("[no_show_tracker] failed to mark unattended appointments as no-show",
-			"err", err)
-		return err
-	}
-
-	for _, a := range unattended {
-		if err := db.Query.InsertAppointmentStatusHistory(ctx, tx, db.InsertAppointmentStatusHistoryParams{
-			ID:            uuid.New(),
-			AppointmentID: a.ID,
-			FromStatus:    db.AppointmentStatusConfirmed,
-			ToStatus:      db.AppointmentStatusNoShow,
-			ChangedBy:     sql.NullString{},
-			ChangedByRole: sql.NullString{String: "system", Valid: true},
-			Reason:        sql.NullString{String: "Auto-detected: customer did not check in", Valid: true},
-		}); err != nil {
-			logger.Warn("[no_show_tracker] failed to insert appointment history",
-				"appointment_id", a.ID,
-				"err", err)
-			continue
-		}
-
-		inserted, err := db.Query.InsertAppointmentPenaltyEvent(ctx, tx, db.InsertAppointmentPenaltyEventParams{
-			ID:            uuid.New(),
-			AppointmentID: a.ID,
-			TenantID:      a.TenantID,
-			CustomerID:    a.CustomerID,
-			EventType:     "no_show",
-			OccurredAt:    time.Now().UTC(),
-		})
+	err := db.Tx(ctx, j.db.Primary(), func(ctx context.Context, txx db.DBTX) error {
+		unattended, err := db.Query.MarkUnattendedAppointmentsNoShow(ctx, txx)
 		if err != nil {
-			logger.Warn("[no_show_tracker] failed to insert no-show penalty event",
-				"appointment_id", a.ID,
-				"err", err)
-			continue
+			return fault.Wrap(err, fault.Internal("failed to mark unattended appointments"))
 		}
 
-		if inserted == 0 {
-			continue
-		}
-
-		key := customerTenantKey{customerID: a.CustomerID, tenantID: a.TenantID}
-		noShowUpdates[key]++
-		affected[key] = struct{}{}
-	}
-
-	recentlyCancelled, err := db.Query.FindRecentlyCancelledAppointments(ctx, tx)
-	if err != nil {
-		logger.Warn("[no_show_tracker] failed to find recently cancelled appointments",
-			"err", err)
-		return err
-	}
-
-	tenantSettingsCache := make(map[uuid.UUID]db.TenantSettings)
-	for _, a := range recentlyCancelled {
-		if !a.CancelledAt.Valid {
-			continue
-		}
-
-		tenantSettings, ok := tenantSettingsCache[a.TenantID]
-		if !ok {
-			tenant, tenantErr := db.Query.FindTenantByID(ctx, tx, a.TenantID)
-			if tenantErr != nil {
-				logger.Warn("[no_show_tracker] failed to find tenant",
-					"tenant_id", a.TenantID,
-					"err", tenantErr)
-				continue
-			}
-
-			if err := json.Unmarshal(tenant.Settings, &tenantSettings); err != nil {
-				logger.Warn("[no_show_tracker] failed to unmarshal tenant settings",
-					"tenant_id", a.TenantID,
+		for _, a := range unattended {
+			if err := db.Query.InsertAppointmentStatusHistory(ctx, txx, db.InsertAppointmentStatusHistoryParams{
+				ID:            uuid.New(),
+				AppointmentID: a.ID,
+				FromStatus:    db.AppointmentStatusConfirmed,
+				ToStatus:      db.AppointmentStatusNoShow,
+				ChangedBy:     sql.NullString{},
+				ChangedByRole: sql.NullString{String: "system", Valid: true},
+				Reason:        sql.NullString{String: "Auto-detected: customer did not check in", Valid: true},
+			}); err != nil {
+				logger.Warn("[no_show_tracker] failed to insert appointment history",
+					"appointment_id", a.ID,
 					"err", err)
 				continue
 			}
-			tenantSettingsCache[a.TenantID] = tenantSettings
+
+			inserted, err := db.Query.InsertAppointmentPenaltyEvent(ctx, txx, db.InsertAppointmentPenaltyEventParams{
+				ID:            uuid.New(),
+				AppointmentID: a.ID,
+				TenantID:      a.TenantID,
+				CustomerID:    a.CustomerID,
+				EventType:     "no_show",
+				OccurredAt:    time.Now().UTC(),
+			})
+			if err != nil {
+				logger.Warn("[no_show_tracker] failed to insert no-show penalty event",
+					"appointment_id", a.ID,
+					"err", err)
+				continue
+			}
+
+			if inserted == 0 {
+				continue
+			}
+
+			key := customerTenantKey{customerID: a.CustomerID, tenantID: a.TenantID}
+			noShowUpdates[key]++
+			affected[key] = struct{}{}
 		}
 
-		lateHours := tenantSettings.LateCancelHours
-		if lateHours == 0 {
-			lateHours = 2
-		}
-
-		if a.StartsAt.Sub(a.CancelledAt.Time).Hours() >= float64(lateHours) {
-			continue // not a late cancellation
-		}
-
-		inserted, err := db.Query.InsertAppointmentPenaltyEvent(ctx, tx, db.InsertAppointmentPenaltyEventParams{
-			ID:            uuid.New(),
-			AppointmentID: a.ID,
-			TenantID:      a.TenantID,
-			CustomerID:    a.CustomerID,
-			EventType:     "late_cancel",
-			OccurredAt:    a.CancelledAt.Time,
-		})
+		recentlyCancelled, err := db.Query.FindRecentlyCancelledAppointments(ctx, txx)
 		if err != nil {
-			logger.Warn("[no_show_tracker] failed to insert late-cancel penalty event",
-				"appointment_id", a.ID,
-				"err", err)
-			continue
+			return fault.Wrap(err, fault.Internal("failed to find recently cancelled appointments"))
 		}
 
-		if inserted == 0 {
-			continue
+		tenantSettingsCache := make(map[uuid.UUID]db.TenantSettings)
+		for _, a := range recentlyCancelled {
+			if !a.CancelledAt.Valid {
+				continue
+			}
+
+			tenantSettings, ok := tenantSettingsCache[a.TenantID]
+			if !ok {
+				tenant, tenantErr := db.Query.FindTenantByID(ctx, txx, a.TenantID)
+				if tenantErr != nil {
+					logger.Warn("[no_show_tracker] failed to find tenant",
+						"tenant_id", a.TenantID,
+						"err", tenantErr)
+					continue
+				}
+
+				if err := json.Unmarshal(tenant.Settings, &tenantSettings); err != nil {
+					logger.Warn("[no_show_tracker] failed to unmarshal tenant settings",
+						"tenant_id", a.TenantID,
+						"err", err)
+					continue
+				}
+				tenantSettingsCache[a.TenantID] = tenantSettings
+			}
+
+			lateHours := tenantSettings.LateCancelHours
+			if lateHours == 0 {
+				lateHours = 2
+			}
+
+			if a.StartsAt.Sub(a.CancelledAt.Time).Hours() >= float64(lateHours) {
+				continue // not a late cancellation
+			}
+
+			inserted, err := db.Query.InsertAppointmentPenaltyEvent(ctx, txx, db.InsertAppointmentPenaltyEventParams{
+				ID:            uuid.New(),
+				AppointmentID: a.ID,
+				TenantID:      a.TenantID,
+				CustomerID:    a.CustomerID,
+				EventType:     "late_cancel",
+				OccurredAt:    a.CancelledAt.Time,
+			})
+			if err != nil {
+				logger.Warn("[no_show_tracker] failed to insert late-cancel penalty event",
+					"appointment_id", a.ID,
+					"err", err)
+				continue
+			}
+
+			if inserted == 0 {
+				continue
+			}
+
+			key := customerTenantKey{customerID: a.CustomerID, tenantID: a.TenantID}
+			lateCancelUpdates[key]++
+			affected[key] = struct{}{}
 		}
 
-		key := customerTenantKey{customerID: a.CustomerID, tenantID: a.TenantID}
-		lateCancelUpdates[key]++
-		affected[key] = struct{}{}
-	}
+		if err := incrementNoShowBatch(ctx, txx, noShowUpdates); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to increment no-show batch"))
+		}
 
-	if err := incrementNoShowBatch(ctx, tx, noShowUpdates); err != nil {
-		return err
-	}
-	if err := incrementLateCancelBatch(ctx, tx, lateCancelUpdates); err != nil {
-		return err
-	}
+		if err := incrementLateCancelBatch(ctx, txx, lateCancelUpdates); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to increment late batch"))
+		}
 
-	if err := tx.Commit(); err != nil {
-		logger.Warn("[no_show_tracker] failed to commit transaction",
+		return nil
+	})
+
+	if err != nil {
+		logger.Warn("[no_show_tracker] failed to process records",
 			"err", err)
 		return err
 	}
@@ -399,7 +393,7 @@ func (j *job) getCustomerPenaltyCounts(
 	return counts, nil
 }
 
-func incrementNoShowBatch(ctx context.Context, tx db.DBTx, updates map[customerTenantKey]int32) error {
+func incrementNoShowBatch(ctx context.Context, tx db.DBTX, updates map[customerTenantKey]int32) error {
 	if len(updates) == 0 {
 		return nil
 	}
@@ -433,7 +427,7 @@ func incrementNoShowBatch(ctx context.Context, tx db.DBTx, updates map[customerT
 	return nil
 }
 
-func incrementLateCancelBatch(ctx context.Context, tx db.DBTx, updates map[customerTenantKey]int32) error {
+func incrementLateCancelBatch(ctx context.Context, tx db.DBTX, updates map[customerTenantKey]int32) error {
 	if len(updates) == 0 {
 		return nil
 	}
