@@ -1,6 +1,7 @@
 package onboarding_step_resource
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"time"
@@ -86,38 +87,44 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	resourceID := uuid.New()
-	if err := db.Query.InsertResource(c.Request.Context(), h.DB.Primary(), db.InsertResourceParams{
-		ID:        resourceID,
-		TenantID:  tenantID,
-		Name:      req.Name,
-		Type:      req.Type,
-		AvatarUrl: sql.NullString{},
-		SortOrder: 1,
-	}); err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to create resource")))
-		return
-	}
-
-	for _, day := range req.WorkingDays {
-		if err := db.Query.UpsertWorkingHours(c.Request.Context(), h.DB.Primary(), db.UpsertWorkingHoursParams{
-			ID:         uuid.New(),
-			ResourceID: resourceID,
-			DayOfWeek:  int16(day),
-			StartTime:  startTime,
-			EndTime:    endTime,
-			IsActive:   true,
+	err = db.Tx(c.Request.Context(), h.DB.Primary(), func(ctx context.Context, txx db.DBTX) error {
+		resourceID := uuid.New()
+		if err := db.Query.InsertResource(c.Request.Context(), txx, db.InsertResourceParams{
+			ID:        resourceID,
+			TenantID:  tenantID,
+			Name:      req.Name,
+			Type:      req.Type,
+			AvatarUrl: sql.NullString{},
+			SortOrder: 1,
 		}); err != nil {
-			c.Error(fault.Wrap(err, fault.Internal("failed to save working hours")))
-			return
+			return fault.Wrap(err, fault.Internal("failed to create resource"))
 		}
-	}
 
-	if err := db.Query.AdvanceOnboardingStep(c.Request.Context(), h.DB.Primary(), db.AdvanceOnboardingStepParams{
-		TenantID:    tenantID,
-		CurrentStep: stepWhatsApp,
-	}); err != nil {
-		c.Error(fault.Wrap(err, fault.Internal("failed to advance onboarding step")))
+		for _, day := range req.WorkingDays {
+			if err := db.Query.UpsertWorkingHours(c.Request.Context(), txx, db.UpsertWorkingHoursParams{
+				ID:         uuid.New(),
+				ResourceID: resourceID,
+				DayOfWeek:  int16(day),
+				StartTime:  startTime,
+				EndTime:    endTime,
+				IsActive:   true,
+			}); err != nil {
+				return fault.Wrap(err, fault.Internal("failed to save working hours"))
+			}
+		}
+
+		if err := db.Query.AdvanceOnboardingStep(c.Request.Context(), txx, db.AdvanceOnboardingStepParams{
+			TenantID:    tenantID,
+			CurrentStep: stepWhatsApp,
+		}); err != nil {
+			return fault.Wrap(err, fault.Internal("failed to advance onboarding step"))
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		c.Error(err)
 		return
 	}
 
