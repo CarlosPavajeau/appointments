@@ -1,10 +1,6 @@
 import { HttpClient } from "./core/http-client"
 import { ApiError } from "./core/types"
 import type { ApiClientConfig, ProblemDetail, TokenPair } from "./core/types"
-
-export { ApiError }
-export type { ProblemDetail }
-
 import { adminResource } from "./endpoints/admin"
 import { appointmentsEndpoints } from "./endpoints/appointments"
 import { billingEndpoints } from "./endpoints/billings"
@@ -12,7 +8,11 @@ import { customersEndpoints } from "./endpoints/customers"
 import { onboardingResource } from "./endpoints/onboarding"
 import { resourcesEndpoints } from "./endpoints/resources"
 import { servicesEndpoint } from "./endpoints/services"
+import { tenantFlowFieldEndpoints } from "./endpoints/tenant-flow-fields"
 import { tenantEndpoints } from "./endpoints/tenants"
+
+export { ApiError }
+export type { ProblemDetail }
 
 const RESOURCES = {
   admin: adminResource,
@@ -23,6 +23,7 @@ const RESOURCES = {
   resources: resourcesEndpoints,
   services: servicesEndpoint,
   tenants: tenantEndpoints,
+  tenantFlowFields: tenantFlowFieldEndpoints,
 } as const
 
 export type Api = ReturnType<typeof createClient>
