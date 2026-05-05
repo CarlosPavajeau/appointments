@@ -11,9 +11,9 @@ import (
 func (s *service) handleOverlapOnConfirm(
 	ctx context.Context,
 	msg IncomingMessage,
-	session db.FindCustomerActiveConversationSessionRow,
+	session db.ConversationSession,
 	sessionData SessionData,
-	svc db.FindServiceByIDRow,
+	svc db.Service,
 ) error {
 	suggestions, err := s.slotFinder.GetSuggestedSlots(ctx, slot_finder.GetSuggestedSlotsParams{
 		ResourceID: *sessionData.ResourceID,

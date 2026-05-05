@@ -6,7 +6,7 @@ import (
 	"wappiz/pkg/fault"
 )
 
-func (s *service) handleSelectTime(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, customer db.FindCustomerByPhoneNumberRow) error {
+func (s *service) handleSelectTime(ctx context.Context, msg IncomingMessage, session db.ConversationSession, customer db.FindCustomerByPhoneNumberRow) error {
 	interactiveID := msg.InteractiveID
 	if interactiveID == nil {
 		return s.whatsapp.SendText(ctx, msg.From, msg.PhoneNumberID, msg.AccessToken,

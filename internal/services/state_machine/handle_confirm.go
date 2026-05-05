@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, customer db.FindCustomerByPhoneNumberRow) error {
+func (s *service) handleConfirm(ctx context.Context, msg IncomingMessage, session db.ConversationSession, customer db.FindCustomerByPhoneNumberRow) error {
 	interactiveID := msg.InteractiveID
 	if interactiveID == nil {
 		return s.sendConfirmation(ctx, msg, session)

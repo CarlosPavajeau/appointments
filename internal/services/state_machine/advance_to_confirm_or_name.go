@@ -6,7 +6,7 @@ import (
 	"wappiz/pkg/fault"
 )
 
-func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow, sessionData SessionData, customer db.FindCustomerByPhoneNumberRow) error {
+func (s *service) advanceToConfirmOrName(ctx context.Context, msg IncomingMessage, session db.ConversationSession, sessionData SessionData, customer db.FindCustomerByPhoneNumberRow) error {
 	var err error
 	if customer.Name.Valid {
 		sessionData.ConfirmedName = new(customer.Name.String)

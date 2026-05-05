@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *service) validateService(ctx context.Context, tenantID uuid.UUID, interactiveID *string) (*db.FindServiceByIDRow, error) {
+func (s *service) validateService(ctx context.Context, tenantID uuid.UUID, interactiveID *string) (*db.Service, error) {
 	if interactiveID == nil {
 		return nil, apperrors.ErrInvalidFormat
 	}

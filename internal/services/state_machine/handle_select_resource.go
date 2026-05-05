@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *service) handleSelectResource(ctx context.Context, msg IncomingMessage, session db.FindCustomerActiveConversationSessionRow) error {
+func (s *service) handleSelectResource(ctx context.Context, msg IncomingMessage, session db.ConversationSession) error {
 	interactiveID := msg.InteractiveID
 
 	sessionData, err := db.UnmarshalNullableJSONTo[SessionData]([]byte(session.Data))

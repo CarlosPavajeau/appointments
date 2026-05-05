@@ -27,7 +27,7 @@ type customerTenantKey struct {
 }
 
 type evalContext struct {
-	tenants       map[uuid.UUID]db.FindTenantByIDRow
+	tenants       map[uuid.UUID]db.Tenant
 	settings      map[uuid.UUID]db.TenantSettings
 	waConfigs     map[uuid.UUID]db.FindTenantWhatsappConfigRow
 	accessTokens  map[uuid.UUID]string
@@ -199,7 +199,7 @@ func (j *job) process(ctx context.Context) error {
 	}
 
 	eCtx := &evalContext{
-		tenants:       make(map[uuid.UUID]db.FindTenantByIDRow),
+		tenants:       make(map[uuid.UUID]db.Tenant),
 		settings:      make(map[uuid.UUID]db.TenantSettings),
 		waConfigs:     make(map[uuid.UUID]db.FindTenantWhatsappConfigRow),
 		accessTokens:  make(map[uuid.UUID]string),
@@ -297,7 +297,7 @@ func (j *job) evaluateCustomer(ctx context.Context, eCtx *evalContext, tenantID,
 	}
 }
 
-func (j *job) getTenantEvaluationData(ctx context.Context, eCtx *evalContext, tenantID uuid.UUID) (db.FindTenantByIDRow, db.TenantSettings, error) {
+func (j *job) getTenantEvaluationData(ctx context.Context, eCtx *evalContext, tenantID uuid.UUID) (db.Tenant, db.TenantSettings, error) {
 	tenant, ok := eCtx.tenants[tenantID]
 	if !ok {
 		var err error
@@ -306,7 +306,7 @@ func (j *job) getTenantEvaluationData(ctx context.Context, eCtx *evalContext, te
 			logger.Warn("[no_show_tracker] failed to find tenant",
 				"tenant_id", tenantID,
 				"err", err)
-			return db.FindTenantByIDRow{}, db.TenantSettings{}, err
+			return db.Tenant{}, db.TenantSettings{}, err
 		}
 		eCtx.tenants[tenantID] = tenant
 	}
@@ -317,7 +317,7 @@ func (j *job) getTenantEvaluationData(ctx context.Context, eCtx *evalContext, te
 			logger.Warn("[no_show_tracker] failed to unmarshal tenant settings",
 				"tenant_id", tenantID,
 				"err", err)
-			return db.FindTenantByIDRow{}, db.TenantSettings{}, err
+			return db.Tenant{}, db.TenantSettings{}, err
 		}
 		eCtx.settings[tenantID] = settings
 	}
