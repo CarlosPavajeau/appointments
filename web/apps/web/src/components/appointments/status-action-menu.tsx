@@ -23,6 +23,8 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/client-api"
 
+import { Field, FieldLabel, FieldLegend, FieldSet } from "../ui/field"
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
 import {
   getAvailableTransitions,
   getStatusConfig,
@@ -153,35 +155,39 @@ export function StatusActionMenu({
               pendingStatus === "cancelled") && (
               <div className="flex flex-col gap-3">
                 {pendingStatus === "cancelled" && (
-                  <fieldset className="flex flex-col gap-1.5">
-                    <legend className="text-sm font-medium">
-                      Cancelado por
-                    </legend>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input
-                          checked={cancelledBy === "customer"}
-                          className="accent-primary"
-                          name="cancelled_by"
-                          onChange={() => setCancelledBy("customer")}
-                          type="radio"
+                  <FieldSet>
+                    <FieldLegend variant="label">Cancelado por</FieldLegend>
+
+                    <RadioGroup
+                      defaultValue={cancelledBy}
+                      onValueChange={setCancelledBy}
+                    >
+                      <Field orientation="horizontal">
+                        <RadioGroupItem
                           value="customer"
+                          id="cancel-by-customer"
                         />
-                        Cliente
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input
-                          checked={cancelledBy === "business"}
-                          className="accent-primary"
-                          name="cancelled_by"
-                          onChange={() => setCancelledBy("business")}
-                          type="radio"
+                        <FieldLabel
+                          htmlFor="cancel-by-customer"
+                          className="font-normal"
+                        >
+                          Cliente
+                        </FieldLabel>
+                      </Field>
+                      <Field orientation="horizontal">
+                        <RadioGroupItem
                           value="business"
+                          id="cancel-by-business"
                         />
-                        Negocio
-                      </label>
-                    </div>
-                  </fieldset>
+                        <FieldLabel
+                          htmlFor="cancel-by-business"
+                          className="font-normal"
+                        >
+                          Negocio
+                        </FieldLabel>
+                      </Field>
+                    </RadioGroup>
+                  </FieldSet>
                 )}
                 {requiresReason(pendingStatus) && (
                   <Textarea
