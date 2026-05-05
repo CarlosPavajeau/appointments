@@ -23,7 +23,6 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "build:ci": "turbo build:ci",
     "check-types": "turbo check-types",
     "dev:mail": "turbo -F @wappiz/resend dev",
     "dev:web": "turbo -F web dev",
