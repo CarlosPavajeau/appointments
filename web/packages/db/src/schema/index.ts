@@ -1,3 +1,4 @@
+// oxlint-disable oxc/no-barrel-file
 export * from "./appointments"
 export * from "./auth"
 export * from "./billing"

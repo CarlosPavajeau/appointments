@@ -4,10 +4,16 @@ import * as schema from "./schema"
 
 export const relations = defineRelations(schema, (r) => ({
   accounts: {
-    user: r.one.user({
-      from: r.account.userId,
-      to: r.user.id,
+    user: r.one.users({
+      from: r.accounts.userId,
+      to: r.users.id,
     }),
+  },
+  users: {
+    accounts: r.many.accounts(),
+    appointments: r.many.appointments(),
+    sessions: r.many.sessions(),
+    tenants: r.many.tenants(),
   },
   appointmentPenaltyEvents: {
     appointment: r.one.appointments({
@@ -23,23 +29,13 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.tenants.id,
     }),
   },
-  appointmentReminderEvents: {
-    appointment: r.one.appointments({
-      from: r.appointmentReminderEvents.appointmentId,
-      to: r.appointments.id,
-    }),
-    customer: r.one.customers({
-      from: r.appointmentReminderEvents.customerId,
-      to: r.customers.id,
-    }),
-    tenant: r.one.tenants({
-      from: r.appointmentReminderEvents.tenantId,
-      to: r.tenants.id,
-    }),
-  },
   appointments: {
     appointmentPenaltyEvents: r.many.appointmentPenaltyEvents(),
     appointmentReminderEvents: r.many.appointmentReminderEvents(),
+    users: r.many.users({
+      from: r.appointments.id.through(r.appointmentStatusHistory.appointmentId),
+      to: r.users.id.through(r.appointmentStatusHistory.changedBy),
+    }),
     customer: r.one.customers({
       from: r.appointments.customerId,
       to: r.customers.id,
@@ -56,9 +52,67 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.appointments.tenantId,
       to: r.tenants.id,
     }),
-    users: r.many.user({
-      from: r.appointments.id.through(r.appointmentStatusHistory.appointmentId),
-      to: r.user.id.through(r.appointmentStatusHistory.changedBy),
+  },
+  customers: {
+    appointmentPenaltyEvents: r.many.appointmentPenaltyEvents(),
+    appointmentReminderEvents: r.many.appointmentReminderEvents(),
+    appointments: r.many.appointments(),
+    conversationSessions: r.many.conversationSessions(),
+    tenant: r.one.tenants({
+      from: r.customers.tenantId,
+      to: r.tenants.id,
+    }),
+  },
+  tenants: {
+    appointmentPenaltyEvents: r.many.appointmentPenaltyEvents(),
+    appointmentReminderEvents: r.many.appointmentReminderEvents(),
+    appointments: r.many.appointments(),
+    conversationSessions: r.many.conversationSessions(),
+    customers: r.many.customers(),
+    onboardingProgresses: r.many.onboardingProgress(),
+    resources: r.many.resources(),
+    services: r.many.services(),
+    plans: r.many.plans(),
+    tenantFlowFields: r.many.tenantFlowFields(),
+    users: r.many.users({
+      from: r.tenants.id.through(r.tenantUsers.tenantId),
+      to: r.users.id.through(r.tenantUsers.userId),
+    }),
+    tenantWhatsappConfigs: r.many.tenantWhatsappConfigs(),
+  },
+  appointmentReminderEvents: {
+    appointment: r.one.appointments({
+      from: r.appointmentReminderEvents.appointmentId,
+      to: r.appointments.id,
+    }),
+    customer: r.one.customers({
+      from: r.appointmentReminderEvents.customerId,
+      to: r.customers.id,
+    }),
+    tenant: r.one.tenants({
+      from: r.appointmentReminderEvents.tenantId,
+      to: r.tenants.id,
+    }),
+  },
+  resources: {
+    appointments: r.many.appointments(),
+    services: r.many.services({
+      from: r.resources.id.through(r.resourceServices.resourceId),
+      to: r.services.id.through(r.resourceServices.serviceId),
+    }),
+    tenant: r.one.tenants({
+      from: r.resources.tenantId,
+      to: r.tenants.id,
+    }),
+    scheduleOverrides: r.many.scheduleOverrides(),
+    workingHours: r.many.workingHours(),
+  },
+  services: {
+    appointments: r.many.appointments(),
+    resources: r.many.resources(),
+    tenant: r.one.tenants({
+      from: r.services.tenantId,
+      to: r.tenants.id,
     }),
   },
   conversationSessions: {
@@ -75,13 +129,10 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.tenantWhatsappConfigs.id,
     }),
   },
-  customers: {
-    appointmentPenaltyEvents: r.many.appointmentPenaltyEvents(),
-    appointmentReminderEvents: r.many.appointmentReminderEvents(),
-    appointments: r.many.appointments(),
+  tenantWhatsappConfigs: {
     conversationSessions: r.many.conversationSessions(),
     tenant: r.one.tenants({
-      from: r.customers.tenantId,
+      from: r.tenantWhatsappConfigs.tenantId,
       to: r.tenants.id,
     }),
   },
@@ -91,37 +142,16 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.tenants.id,
     }),
   },
-  resources: {
-    appointments: r.many.appointments(),
-    scheduleOverrides: r.many.scheduleOverrides(),
-    services: r.many.services({
-      from: r.resources.id.through(r.resourceServices.resourceId),
-      to: r.services.id.through(r.resourceServices.serviceId),
-    }),
-    tenant: r.one.tenants({
-      from: r.resources.tenantId,
-      to: r.tenants.id,
-    }),
-    workingHours: r.many.workingHours(),
-  },
   scheduleOverrides: {
     resource: r.one.resources({
       from: r.scheduleOverrides.resourceId,
       to: r.resources.id,
     }),
   },
-  services: {
-    appointments: r.many.appointments(),
-    resources: r.many.resources(),
-    tenant: r.one.tenants({
-      from: r.services.tenantId,
-      to: r.tenants.id,
-    }),
-  },
   sessions: {
-    user: r.one.user({
-      from: r.session.userId,
-      to: r.user.id,
+    user: r.one.users({
+      from: r.sessions.userId,
+      to: r.users.id,
     }),
   },
   subscriptionOrders: {
@@ -131,14 +161,12 @@ export const relations = defineRelations(schema, (r) => ({
     }),
   },
   subscriptions: {
-    plan: r.one.plans({
-      from: r.subscriptions.planId,
-      to: r.plans.id,
-    }),
     subscriptionOrders: r.many.subscriptionOrders(),
-    tenant: r.one.tenants({
-      from: r.subscriptions.tenantId,
-      to: r.tenants.id,
+  },
+  plans: {
+    tenants: r.many.tenants({
+      from: r.plans.id.through(r.subscriptions.planId),
+      to: r.tenants.id.through(r.subscriptions.tenantId),
     }),
   },
   tenantFlowFields: {
@@ -146,36 +174,6 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.tenantFlowFields.tenantId,
       to: r.tenants.id,
     }),
-  },
-  tenantWhatsappConfigs: {
-    conversationSessions: r.many.conversationSessions(),
-    tenant: r.one.tenants({
-      from: r.tenantWhatsappConfigs.tenantId,
-      to: r.tenants.id,
-    }),
-  },
-  tenants: {
-    appointmentPenaltyEvents: r.many.appointmentPenaltyEvents(),
-    appointmentReminderEvents: r.many.appointmentReminderEvents(),
-    appointments: r.many.appointments(),
-    conversationSessions: r.many.conversationSessions(),
-    customers: r.many.customers(),
-    onboardingProgresses: r.many.onboardingProgress(),
-    resources: r.many.resources(),
-    services: r.many.services(),
-    subscriptions: r.many.subscriptions(),
-    tenantFlowFields: r.many.tenantFlowFields(),
-    tenantWhatsappConfigs: r.many.tenantWhatsappConfigs(),
-    users: r.many.user({
-      from: r.tenants.id.through(r.tenantUsers.tenantId),
-      to: r.user.id.through(r.tenantUsers.userId),
-    }),
-  },
-  users: {
-    accounts: r.many.account(),
-    appointments: r.many.appointments(),
-    sessions: r.many.session(),
-    tenants: r.many.tenants(),
   },
   workingHours: {
     resource: r.one.resources({

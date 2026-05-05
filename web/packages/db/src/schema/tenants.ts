@@ -15,20 +15,20 @@ import {
 export const tenants = pgTable(
   "tenants",
   {
+    id: uuid().defaultRandom().primaryKey(),
+    name: varchar({ length: 255 }).notNull(),
+    slug: varchar({ length: 100 }).notNull(),
+    timezone: varchar({ length: 50 }).default("America/Bogota").notNull(),
+    currency: varchar({ length: 3 }).default("COP").notNull(),
     appointmentsThisMonth: integer("appointments_this_month")
       .default(0)
       .notNull(),
+    monthResetAt: timestamp("month_reset_at", { withTimezone: true }).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    settings: jsonb().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
-    currency: varchar({ length: 3 }).default("COP").notNull(),
-    id: uuid().defaultRandom().primaryKey(),
-    isActive: boolean("is_active").default(true).notNull(),
-    monthResetAt: timestamp("month_reset_at", { withTimezone: true }).notNull(),
-    name: varchar({ length: 255 }).notNull(),
-    settings: jsonb().default({}),
-    slug: varchar({ length: 100 }).notNull(),
-    timezone: varchar({ length: 50 }).default("America/Bogota").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
@@ -46,32 +46,32 @@ export const whatsappActivationStatus = pgEnum("whatsapp_activation_status", [
 export const tenantWhatsappConfigs = pgTable(
   "tenant_whatsapp_configs",
   {
-    accessToken: text("access_token"),
-    activationContactEmail: text("activation_contact_email"),
-    activationNotes: text("activation_notes"),
-    activationRequestedAt: timestamp("activation_requested_at", {
-      withTimezone: true,
-    }),
-    activationStatus: whatsappActivationStatus("activation_status")
-      .default("pending")
-      .notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .default(sql`now()`)
-      .notNull(),
-    displayPhoneNumber: varchar("display_phone_number", { length: 20 }),
     id: uuid().defaultRandom().primaryKey(),
-    isActive: boolean("is_active").default(false).notNull(),
-    phoneNumberId: varchar("phone_number_id", { length: 100 }),
-    rejectReason: text("reject_reason"),
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    wabaId: varchar("waba_id", { length: 100 }),
+    phoneNumberId: varchar("phone_number_id", { length: 100 }),
+    displayPhoneNumber: varchar("display_phone_number", { length: 20 }),
+    accessToken: text("access_token"),
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+    isActive: boolean("is_active").default(false).notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .default(sql`now()`)
       .notNull(),
-    verifiedAt: timestamp("verified_at", { withTimezone: true }),
-    wabaId: varchar("waba_id", { length: 100 }),
+    activationStatus: whatsappActivationStatus("activation_status")
+      .default("pending")
+      .notNull(),
+    activationRequestedAt: timestamp("activation_requested_at", {
+      withTimezone: true,
+    }),
+    activationNotes: text("activation_notes"),
+    activationContactEmail: text("activation_contact_email"),
+    rejectReason: text("reject_reason"),
   },
   (table) => [
     unique("tenant_whatsapp_configs_phone_number_id_key").on(
@@ -86,19 +86,19 @@ export const flowFieldType = pgEnum("flow_field_type", ["predefined", "custom"])
 export const tenantFlowFields = pgTable(
   "tenant_flow_fields",
   {
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .default(sql`now()`)
-      .notNull(),
-    fieldKey: varchar("field_key", { length: 50 }).notNull(),
-    fieldType: flowFieldType("field_type").notNull(),
     id: uuid().defaultRandom().primaryKey(),
-    isEnabled: boolean("is_enabled").default(true).notNull(),
-    isRequired: boolean("is_required").default(false).notNull(),
-    question: text("question"),
-    sortOrder: integer("sort_order").notNull(),
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
+    fieldKey: varchar("field_key", { length: 50 }).notNull(),
+    fieldType: flowFieldType("field_type").notNull(),
+    question: text(),
+    isRequired: boolean("is_required").default(false).notNull(),
+    isEnabled: boolean("is_enabled").default(true).notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`now()`)
+      .notNull(),
   },
   (table) => [unique("uq_tenant_field_key").on(table.tenantId, table.fieldKey)]
 )

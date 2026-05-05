@@ -1,80 +1,104 @@
-import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+import {
+  boolean,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core"
 
-export const user = pgTable("users", {
-  banExpires: timestamp("ban_expires", { precision: 6, withTimezone: true }),
-  banReason: text("ban_reason"),
-  banned: boolean("banned"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  id: text("id").primaryKey(),
-  image: text("image"),
-  name: text("name").notNull(),
-  role: text("role"),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-})
+export const users = pgTable(
+  "users",
+  {
+    createdAt: timestamp("created_at")
+      .default(sql`now()`)
+      .notNull(),
+    email: text().notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    id: text().primaryKey(),
+    image: text(),
+    name: text().notNull(),
+    updatedAt: timestamp("updated_at")
+      .default(sql`now()`)
+      .notNull(),
+    banExpires: timestamp("ban_expires", { precision: 6, withTimezone: true }),
+    banReason: text("ban_reason"),
+    banned: boolean(),
+    role: text(),
+  },
+  (table) => [unique("users_email_unique").on(table.email)]
+)
 
-export const session = pgTable(
+export const sessions = pgTable(
   "sessions",
   {
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    id: text("id").primaryKey(),
-    impersonatedBy: text("impersonated_by"),
-    ipAddress: text("ip_address"),
-    token: text("token").notNull().unique(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
+    createdAt: timestamp("created_at")
+      .default(sql`now()`)
       .notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    id: text().primaryKey(),
+    ipAddress: text("ip_address"),
+    token: text().notNull(),
+    updatedAt: timestamp("updated_at").notNull(),
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
   },
-  (table) => [index("session_userId_idx").on(table.userId)]
+  (table) => [
+    index("session_userId_idx").using("btree", table.userId.asc().nullsLast()),
+    unique("sessions_token_unique").on(table.token),
+  ]
 )
 
-export const account = pgTable(
+export const accounts = pgTable(
   "accounts",
   {
     accessToken: text("access_token"),
     accessTokenExpiresAt: timestamp("access_token_expires_at"),
     accountId: text("account_id").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    id: text("id").primaryKey(),
+    createdAt: timestamp("created_at")
+      .default(sql`now()`)
+      .notNull(),
+    id: text().primaryKey(),
     idToken: text("id_token"),
-    password: text("password"),
+    password: text(),
     providerId: text("provider_id").notNull(),
     refreshToken: text("refresh_token"),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-    scope: text("scope"),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
+    scope: text(),
+    updatedAt: timestamp("updated_at").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
   },
-  (table) => [index("account_userId_idx").on(table.userId)]
+  (table) => [
+    index("account_userId_idx").using("btree", table.userId.asc().nullsLast()),
+  ]
 )
 
-export const verification = pgTable(
+export const verifications = pgTable(
   "verifications",
   {
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
+    createdAt: timestamp("created_at")
+      .default(sql`now()`)
       .notNull(),
-    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    id: text().primaryKey(),
+    identifier: text().notNull(),
+    updatedAt: timestamp("updated_at")
+      .default(sql`now()`)
+      .notNull(),
+    value: text().notNull(),
   },
-  (table) => [index("verification_identifier_idx").on(table.identifier)]
+  (table) => [
+    index("verification_identifier_idx").using(
+      "btree",
+      table.identifier.asc().nullsLast()
+    ),
+  ]
 )
 
 export const jwks = pgTable("jwks", {
@@ -83,7 +107,7 @@ export const jwks = pgTable("jwks", {
     withTimezone: true,
   }).notNull(),
   expiresAt: timestamp("expires_at", { precision: 6, withTimezone: true }),
-  id: text("id").primaryKey(),
+  id: text().primaryKey(),
   privateKey: text("private_key").notNull(),
   publicKey: text("public_key").notNull(),
 })
