@@ -27,6 +27,7 @@ export const auth = betterAuth({
     provider: "pg",
 
     schema,
+    usePlural: true,
   }),
   databaseHooks: {
     user: {
