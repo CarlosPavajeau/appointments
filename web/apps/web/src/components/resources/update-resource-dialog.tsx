@@ -31,7 +31,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { api } from "@/lib/client-api"
 
 const updateResourceSchema = type({
-  "avatarURL?": "string",
+  avatarURL: type("string").optional(),
   name: type("string >= 1").configure({
     message: "El nombre es requerido",
   }),
