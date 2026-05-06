@@ -23,7 +23,6 @@ SELECT id,
        created_at
 FROM resources
 WHERE id = $1
-  AND is_active = true
 LIMIT 1
 `
 
@@ -50,7 +49,6 @@ type FindResourceByIdRow struct {
 //	       created_at
 //	FROM resources
 //	WHERE id = $1
-//	  AND is_active = true
 //	LIMIT 1
 func (q *Queries) FindResourceById(ctx context.Context, db DBTX, id uuid.UUID) (FindResourceByIdRow, error) {
 	row := db.QueryRowContext(ctx, findResourceById, id)

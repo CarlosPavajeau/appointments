@@ -412,7 +412,6 @@ type Querier interface {
 	//         created_at
 	//  FROM resources
 	//  WHERE id = $1
-	//    AND is_active = true
 	//  LIMIT 1
 	FindResourceById(ctx context.Context, db DBTX, id uuid.UUID) (FindResourceByIdRow, error)
 	//FindResourceOccupiedSlots
@@ -482,7 +481,6 @@ type Querier interface {
 	//         created_at
 	//  FROM resources
 	//  WHERE tenant_id = $1
-	//    AND is_active = true
 	//  ORDER BY created_at
 	FindResourcesByTenant(ctx context.Context, db DBTX, tenantID uuid.UUID) ([]FindResourcesByTenantRow, error)
 	//FindServiceByID

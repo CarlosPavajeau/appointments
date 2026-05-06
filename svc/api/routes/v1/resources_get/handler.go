@@ -28,6 +28,7 @@ type Response struct {
 	Type         string                 `json:"type"`
 	AvatarURL    string                 `json:"avatarUrl"`
 	SortOrder    int32                  `json:"sortOrder"`
+	IsActive     bool                   `json:"isActive"`
 	WorkingHours []WorkingHoursResponse `json:"workingHours"`
 }
 
@@ -93,6 +94,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		Type:         r.Type,
 		AvatarURL:    r.AvatarUrl,
 		SortOrder:    r.SortOrder,
+		IsActive:     r.IsActive,
 		WorkingHours: whResponse,
 	})
 }

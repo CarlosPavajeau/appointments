@@ -23,7 +23,6 @@ SELECT id,
        created_at
 FROM resources
 WHERE tenant_id = $1
-  AND is_active = true
 ORDER BY created_at
 `
 
@@ -50,7 +49,6 @@ type FindResourcesByTenantRow struct {
 //	       created_at
 //	FROM resources
 //	WHERE tenant_id = $1
-//	  AND is_active = true
 //	ORDER BY created_at
 func (q *Queries) FindResourcesByTenant(ctx context.Context, db DBTX, tenantID uuid.UUID) ([]FindResourcesByTenantRow, error) {
 	rows, err := db.QueryContext(ctx, findResourcesByTenant, tenantID)

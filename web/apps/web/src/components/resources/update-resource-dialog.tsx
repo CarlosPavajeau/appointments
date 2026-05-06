@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { api } from "@/lib/client-api"
 
@@ -37,6 +38,7 @@ const updateResourceSchema = type({
   type: type("string >= 1").configure({
     message: "El tipo es requerido",
   }),
+  isActive: "boolean",
 })
 
 type UpdateResourceFormValues = typeof updateResourceSchema.infer
@@ -154,6 +156,28 @@ export function UpdateResourceDialog({ resourceId, defaultValues }: Props) {
                     id={field.name}
                     placeholder="https://ejemplo.com/foto.png"
                     aria-invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="isActive"
+              render={({ field, fieldState }) => (
+                <Field
+                  orientation="horizontal"
+                  className="w-fit"
+                  data-invalid={fieldState.invalid}
+                >
+                  <FieldLabel htmlFor={field.name}>Activo</FieldLabel>
+                  <Switch
+                    id={field.name}
+                    name={field.name}
+                    aria-invalid={fieldState.invalid}
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
                   />
                   <FieldError errors={[fieldState.error]} />
                 </Field>

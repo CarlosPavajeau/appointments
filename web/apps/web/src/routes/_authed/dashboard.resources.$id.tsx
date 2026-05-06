@@ -125,11 +125,7 @@ function RouteComponent() {
         <div className="shrink-0">
           <UpdateResourceDialog
             resourceId={resource.id}
-            defaultValues={{
-              avatarURL: resource.avatarUrl,
-              name: resource.name,
-              type: resource.type,
-            }}
+            defaultValues={resource}
           />
         </div>
       </header>

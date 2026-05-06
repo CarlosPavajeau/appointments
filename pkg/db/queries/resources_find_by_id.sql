@@ -9,5 +9,4 @@ SELECT id,
        created_at
 FROM resources
 WHERE id = $1
-  AND is_active = true
 LIMIT 1;
