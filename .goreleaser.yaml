@@ -21,7 +21,10 @@ builds:
     binary: wappiz
 
     ldflags:
-      - -s -w -X {{.Env.PACKAGE_PATH}}={{.Version}}
+      - -s -w
+      - -X 'github.com/CarlosPavajeau/wappiz/pkg/buildinfo.Version={{.Version}}'
+      - -X 'github.com/CarlosPavajeau/wappiz/pkg/buildinfo.Revision={{.FullCommit}}'
+      - -X 'github.com/CarlosPavajeau/wappiz/pkg/buildinfo.BuildTime={{.Date}}'
 
 upx:
   - enabled: true
