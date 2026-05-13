@@ -6,6 +6,19 @@ help: ## Display this help.
 install-go: ## Install Go dependencies
 	go mod download
 
+.PHONY: install
+install: install-go ## Install all dependencies
+	cd web && bun install --frozen-lockfile
+
+.PHONY: generate-sql
+generate-sql:
+	@rm -rf ./web/packages/db/out
+	@cd web/packages/db && bun run db:generate --name=init --breakpoints=false --out=out --dialect=postgresql --schema=./src/schema/index.ts
+	@rm -rf ./pkg/db/schema && mkdir -p ./pkg/db/schema
+	@awk -v dir=./pkg/db/schema -f ./scripts/split-schema.awk \
+		$$(find ./web/packages/db/out -name "migration.sql" -type f | head -1)
+	@rm -rf ./web/packages/db/out
+
 .PHONY: generate
 generate:
 	rm ./pkg/db/*_generated.go || true
