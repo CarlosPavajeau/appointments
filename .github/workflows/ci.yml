@@ -25,43 +25,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          go-version-file: go.mod
-          check-latest: true
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
 
-      - name: Cache Go build and module files
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - name: Build
+        run: bazel build //...
 
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Verify dependencies
-        run: go mod verify
-
-      - name: Run vet
-        run: go vet ./...
-
-      - name: Run tests
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
-
-      - name: Build all packages
-        run: go build ./...
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.out
-          if-no-files-found: error
+      - name: Test
+        run: bazel test //...
 
   integration-tests:
     name: Integration Tests (Postgres)
@@ -87,21 +62,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.14.0
         with:
-          go-version-file: go.mod
-          check-latest: true
-
-      - name: Cache Go build and module files
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
 
       - name: Install psql client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -116,11 +82,4 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/wappiz_test?sslmode=disable
           APP_ENV: test
-        run: go test -tags=integration -race -covermode=atomic -coverprofile=integration-coverage.out ./...
-
-      - name: Upload integration coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-coverage-report
-          path: integration-coverage.out
-          if-no-files-found: error
+        run: bazel test --@rules_go//go/config:tags=integration //...
